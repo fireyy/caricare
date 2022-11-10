@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "cc-core",
+    "cc-gui",
+]
+
+[profile.dev]
+split-debuginfo = "unpacked"
