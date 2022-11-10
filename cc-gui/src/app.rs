@@ -1,4 +1,4 @@
-use cc_core::{OssError, OSS};
+use cc_core::{tracing, OssError, OSS};
 use std::sync::mpsc;
 
 enum Update {
@@ -58,8 +58,12 @@ impl eframe::App for App {
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
                 Update::Uploaded(result) => match result {
-                    Ok(str) => println!("{}", str),
+                    Ok(str) => {
+                        self.state = State::Idle(Route::Upload);
+                        tracing::info!("{}", str);
+                    }
                     Err(err) => {
+                        self.state = State::Idle(Route::Upload);
                         self.err = Some(err.message());
                     }
                 },

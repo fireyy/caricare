@@ -1,6 +1,7 @@
 use aliyun_oss_client::blocking::builder::ClientWithMiddleware;
 use aliyun_oss_client::{client::Client, errors::OssError};
 use md5;
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
 pub struct OSS {
@@ -19,11 +20,14 @@ impl OSS {
     }
 
     pub fn put(&self, path: String) -> Result<String, OssError> {
-        let file_content = std::fs::read(PathBuf::from(path)).unwrap();
+        let path = PathBuf::from(path);
+        let path_clone = path.clone();
+        let ext = path_clone.extension().and_then(OsStr::to_str).unwrap();
+        let file_content = std::fs::read(path).unwrap();
         let digest = md5::compute(&file_content);
         let result = self
             .client
-            .put_content(file_content, &format!("{:x}", digest));
+            .put_content(file_content, &format!("catrun/test/{:x}.{}", digest, ext));
 
         result
     }
