@@ -12,7 +12,7 @@ enum Update {
     List(Result<ObjectList, OssError>),
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 enum ShowType {
     List,
     Thumb,
@@ -33,6 +33,7 @@ enum Route {
 pub struct App {
     oss: OssConfig,
     rt: runtime::Runtime,
+    fetcher: Option<ObjectList>,
     list: Vec<OssFile>,
     update_tx: mpsc::SyncSender<Update>,
     update_rx: mpsc::Receiver<Update>,
@@ -56,6 +57,7 @@ impl App {
         let mut this = Self {
             oss,
             rt,
+            fetcher: None,
             list: vec![],
             update_tx,
             update_rx,
@@ -164,6 +166,48 @@ impl App {
                 );
             });
     }
+
+    fn bar_contents(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        if ui.button("Upload file...").clicked() {
+            if let Some(path) = rfd::FileDialog::new().pick_file() {
+                self.picked_path = Some(path.display().to_string());
+            }
+        }
+        let enabled =
+            self.state != State::Busy(Route::List) && self.state != State::Busy(Route::Upload);
+        ui.add_enabled_ui(enabled, |ui| {
+            if ui.button("\u{1f503}").clicked() {
+                self.get_list(ctx);
+            }
+        });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+            ui.style_mut().spacing.item_spacing.x = 0.0;
+            egui::Frame {
+                fill: ui.style().visuals.widgets.inactive.bg_fill,
+                rounding: egui::Rounding::same(2.0),
+                ..egui::Frame::default()
+            }
+            .show(ui, |ui| {
+                ui.style_mut().visuals.button_frame = false;
+                ui.style_mut().visuals.widgets.active.rounding = egui::Rounding::same(2.0);
+                ui.selectable_value(&mut self.show_type, ShowType::Thumb, "\u{25a3}");
+                ui.selectable_value(&mut self.show_type, ShowType::List, "\u{2630}");
+            });
+        });
+    }
+    fn status_bar_contents(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
+        egui::widgets::global_dark_light_mode_switch(ui);
+
+        if let Some(err) = &self.err {
+            ui.label(egui::RichText::new(err).color(egui::Color32::RED));
+        }
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+            if ui.button("\u{1f4ac}").clicked() {
+                //
+            }
+        });
+    }
 }
 
 impl eframe::App for App {
@@ -182,18 +226,29 @@ impl eframe::App for App {
                 },
                 Update::List(result) => match result {
                     Ok(str) => {
-                        for d in str.object_list {
-                            let url = self.oss.get_file_url(d.key.clone());
-                            self.list.push(OssFile {
-                                name: d.key.replace(&self.oss.path, "").replace("/", ""),
-                                url,
-                                size: format!("{}", ByteSize(d.size)),
-                                last_modified: d
-                                    .last_modified
-                                    .format("%Y-%m-%d %H:%M:%S")
-                                    .to_string(),
-                            });
+                        if let Some(_str) = &self.fetcher {
+                            //
+                        } else {
+                            self.fetcher = Some(str);
                         }
+                        match &self.fetcher {
+                            Some(str) => {
+                                for d in &str.object_list {
+                                    let url = self.oss.get_file_url(d.key.clone());
+                                    self.list.push(OssFile {
+                                        name: d.key.replace(&self.oss.path, "").replace("/", ""),
+                                        url,
+                                        size: format!("{}", ByteSize(d.size)),
+                                        last_modified: d
+                                            .last_modified
+                                            .format("%Y-%m-%d %H:%M:%S")
+                                            .to_string(),
+                                    });
+                                }
+                            }
+                            None => {}
+                        }
+
                         self.state = State::Idle(Route::List);
                     }
                     Err(err) => {
@@ -204,30 +259,19 @@ impl eframe::App for App {
             }
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                if ui.button("Upload file...").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_file() {
-                        self.picked_path = Some(path.display().to_string());
-                    }
-                }
-                let enabled = self.state != State::Busy(Route::List)
-                    && self.state != State::Busy(Route::Upload);
-                ui.add_enabled_ui(enabled, |ui| {
-                    if ui.button("\u{1f503}").clicked() {
-                        self.get_list(ctx);
-                    }
-                });
-                if let Some(err) = &self.err {
-                    ui.set_min_width(100.0);
-                    ui.label(egui::RichText::new(err).color(egui::Color32::RED));
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                    ui.selectable_value(&mut self.show_type, ShowType::Thumb, "\u{25a3}");
-                    ui.selectable_value(&mut self.show_type, ShowType::List, "\u{2630}");
+        egui::TopBottomPanel::top("top_bar")
+            .frame(egui::Frame {
+                inner_margin: egui::style::Margin::same(5.0),
+                fill: egui::Color32::from_gray(100),
+                ..egui::Frame::default()
+            })
+            .show(ctx, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    self.bar_contents(ui, ctx);
                 });
             });
-            ui.separator();
+
+        egui::CentralPanel::default().show(ctx, |ui| {
             match &mut self.state {
                 State::Idle(ref mut route) => match route {
                     Route::Upload => {
@@ -251,6 +295,13 @@ impl eframe::App for App {
                     });
                 }
             };
+        });
+
+        egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.visuals_mut().button_frame = false;
+                self.status_bar_contents(ui, ctx);
+            });
         });
 
         if !self.dropped_files.is_empty() {

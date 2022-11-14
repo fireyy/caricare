@@ -78,6 +78,7 @@ impl OssConfig {
         let path = self.path.clone();
         let mut query = Query::new();
         query.insert("prefix", path);
+        query.insert("max-keys", "20");
         let result = client.get_object_list(query).await;
         tracing::info!("{:?}", result);
         result
