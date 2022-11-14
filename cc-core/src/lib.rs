@@ -1,6 +1,9 @@
 mod oss;
-pub use aliyun_oss_client::errors::OssError;
-pub use oss::OSS;
+pub use aliyun_oss_client::{
+    errors::OssError,
+    object::{Object, ObjectList},
+};
+pub use oss::OssConfig;
 pub use tracing;
 
 use tracing_subscriber::fmt;
