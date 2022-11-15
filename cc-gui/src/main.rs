@@ -21,6 +21,7 @@ fn main() {
         eframe::NativeOptions {
             drag_and_drop_support: true,
             initial_window_size: Some(egui::vec2(800.0, 400.0)),
+            min_window_size: Some(egui::vec2(400.0, 300.0)),
             ..Default::default()
         },
         Box::new(|cc: &eframe::CreationContext| Box::new(app::App::new(cc))),

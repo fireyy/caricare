@@ -234,7 +234,7 @@ impl App {
         });
     }
 
-    fn show_image(&mut self, _ctx: &egui::Context) {
+    fn show_image(&mut self, ctx: &egui::Context) {
         let Self {
             preview_modal: show_modal,
             current_img,
@@ -269,9 +269,10 @@ impl App {
                     ui.monospace(format!("size: {}", current_img.size));
                     ui.monospace(format!("last modified: {}", current_img.last_modified));
                 });
+                let win_size = ctx.input().screen_rect().size();
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
-                    .max_height(300.0)
+                    .max_height(win_size.y - 200.0)
                     .show(ui, |ui| {
                         if let Some(img) = self.net_images.get_image(current_img.url.clone()) {
                             let mut size = img.size_vec2();
@@ -303,11 +304,7 @@ impl eframe::App for App {
                 },
                 Update::List(result) => match result {
                     Ok(str) => {
-                        if let Some(_str) = &self.fetcher {
-                            //
-                        } else {
-                            self.fetcher = Some(str);
-                        }
+                        self.fetcher = Some(str);
                         match &self.fetcher {
                             Some(str) => {
                                 for d in &str.object_list {
@@ -337,42 +334,14 @@ impl eframe::App for App {
             }
         }
 
-        egui::TopBottomPanel::top("top_bar")
-            .frame(egui::Frame {
-                inner_margin: egui::style::Margin::same(5.0),
-                fill: egui::Color32::from_gray(100),
-                ..egui::Frame::default()
-            })
-            .show(ctx, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    self.bar_contents(ui, ctx);
-                });
-            });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            match &mut self.state {
-                State::Idle(ref mut route) => match route {
-                    Route::Upload => {
-                        //
-                    }
-                    Route::List => match self.show_type {
-                        ShowType::List => self.render_list(ui),
-                        ShowType::Thumb => self.render_thumb(ui),
-                    },
-                },
-                State::Busy(route) => {
-                    ui.centered_and_justified(|ui| match route {
-                        Route::Upload => {
-                            ui.spinner();
-                            ui.heading("Uploading file...");
-                        }
-                        Route::List => {
-                            ui.spinner();
-                            ui.heading("Getting file list...");
-                        }
+        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
+            egui::Frame::none()
+                .inner_margin(egui::style::Margin::symmetric(0.0, 5.0))
+                .show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        self.bar_contents(ui, ctx);
                     });
-                }
-            };
+                });
         });
 
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
@@ -380,6 +349,36 @@ impl eframe::App for App {
                 ui.visuals_mut().button_frame = false;
                 self.status_bar_contents(ui, ctx);
             });
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::Frame::none()
+                .inner_margin(egui::style::Margin::same(0.0))
+                .show(ui, |ui| {
+                    match &mut self.state {
+                        State::Idle(ref mut route) => match route {
+                            Route::Upload => {
+                                //
+                            }
+                            Route::List => match self.show_type {
+                                ShowType::List => self.render_list(ui),
+                                ShowType::Thumb => self.render_thumb(ui),
+                            },
+                        },
+                        State::Busy(route) => {
+                            ui.centered_and_justified(|ui| match route {
+                                Route::Upload => {
+                                    ui.spinner();
+                                    ui.heading("Uploading file...");
+                                }
+                                Route::List => {
+                                    ui.spinner();
+                                    ui.heading("Getting file list...");
+                                }
+                            });
+                        }
+                    };
+                });
         });
 
         self.show_image(ctx);
