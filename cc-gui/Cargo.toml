@@ -16,3 +16,4 @@ tokio = { version = "1", features = ["rt-multi-thread"] }
 cached_network_image = "1.0"
 directories = "4.0"
 bytesize = "1.1.0"
+egui-modal = "0.1"

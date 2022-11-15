@@ -31,7 +31,7 @@ pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &NetworkImages) -> egui
         ui.allocate_ui_at_rect(rect, |ui| {
             egui::Frame {
                 inner_margin: egui::style::Margin::same(5.0),
-                stroke: egui::Stroke::new(2.0, Color32::from_gray(200)),
+                stroke: egui::Stroke::new(2.0, ui.style().visuals.weak_text_color()),
                 ..egui::Frame::default()
             }
             .show(ui, |ui| {
@@ -49,8 +49,14 @@ pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &NetworkImages) -> egui
                         }
                     });
                     ui.vertical(|ui| {
-                        ui.label(text_ellipsis(&data.name, Color32::BLACK, 1));
-                        ui.label(RichText::new(data.size).color(Color32::from_gray(200)));
+                        ui.label(text_ellipsis(
+                            &data.name,
+                            ui.style().visuals.strong_text_color(),
+                            1,
+                        ));
+                        ui.label(
+                            RichText::new(data.size).color(ui.style().visuals.weak_text_color()),
+                        );
                     });
                 });
             });

@@ -4,9 +4,10 @@ mod app;
 mod images;
 mod widgets;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct OssFile {
     pub name: String,
+    pub key: String,
     pub url: String,
     pub size: String,
     pub last_modified: String,

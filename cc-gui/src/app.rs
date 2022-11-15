@@ -4,6 +4,7 @@ use crate::OssFile;
 use bytesize::ByteSize;
 use cc_core::{tracing, ObjectList, OssConfig, OssError};
 use egui_extras::{Size, TableBuilder};
+use egui_modal::{Icon, Modal};
 use std::sync::mpsc;
 use tokio::runtime;
 
@@ -35,6 +36,7 @@ pub struct App {
     rt: runtime::Runtime,
     fetcher: Option<ObjectList>,
     list: Vec<OssFile>,
+    current_img: OssFile,
     update_tx: mpsc::SyncSender<Update>,
     update_rx: mpsc::Receiver<Update>,
     state: State,
@@ -43,6 +45,8 @@ pub struct App {
     picked_path: Option<String>,
     net_images: NetworkImages,
     show_type: ShowType,
+    preview_modal: Modal,
+    dialog: Modal,
 }
 
 impl App {
@@ -54,10 +58,15 @@ impl App {
             .build()
             .unwrap();
 
+        let preview_modal = Modal::new(&cc.egui_ctx, "preview");
+
+        let dialog = Modal::new(&cc.egui_ctx, "my_dialog");
+
         let mut this = Self {
             oss,
             rt,
             fetcher: None,
+            current_img: OssFile::default(),
             list: vec![],
             update_tx,
             update_rx,
@@ -67,6 +76,8 @@ impl App {
             picked_path: None,
             net_images: NetworkImages::new(cc.egui_ctx.clone()),
             show_type: ShowType::List,
+            preview_modal,
+            dialog,
         };
 
         this.get_list(&cc.egui_ctx);
@@ -132,7 +143,15 @@ impl App {
                 body.rows(text_height, num_rows, |row_index, mut row| {
                     let data = self.list.get(row_index).unwrap();
                     row.col(|ui| {
-                        ui.label(&data.name).on_hover_text(&data.url);
+                        if ui
+                            .add(egui::Label::new(&data.name).sense(egui::Sense::click()))
+                            .on_hover_text(&data.url)
+                            .clicked()
+                        {
+                            self.current_img = data.clone();
+                            self.preview_modal.open();
+                            ui.ctx().request_repaint();
+                        }
                     });
                     row.col(|ui| {
                         ui.label(&data.size);
@@ -159,7 +178,9 @@ impl App {
                             self.net_images.add(url.clone());
                             let resp = item_ui(ui, d.clone(), &self.net_images);
                             if resp.on_hover_text(url).clicked() {
-                                //
+                                self.current_img = d.clone();
+                                self.preview_modal.open();
+                                ui.ctx().request_repaint();
                             }
                         }
                     },
@@ -204,8 +225,64 @@ impl App {
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
             if ui.button("\u{1f4ac}").clicked() {
-                //
+                self.dialog.open_dialog(
+                    Some("Info"),       // title
+                    Some("Working..."), // body
+                    Some(Icon::Info),   // icon
+                )
             }
+        });
+    }
+
+    fn show_image(&mut self, _ctx: &egui::Context) {
+        let Self {
+            preview_modal: show_modal,
+            current_img,
+            ..
+        } = self;
+
+        if current_img.url.is_empty() {
+            return;
+        }
+
+        self.net_images.add(current_img.url.clone());
+
+        show_modal.show(|ui| {
+            show_modal.title(ui, "Preview");
+            show_modal.frame(ui, |ui| {
+                ui.vertical(|ui| {
+                    let url = format!("{}/{}", self.oss.url, current_img.key);
+
+                    if ui
+                        .add(
+                            egui::Label::new(
+                                egui::RichText::new(format!("url: {}{}", url.clone(), "\u{1f4cb}"))
+                                    .monospace(),
+                            )
+                            .sense(egui::Sense::click()),
+                        )
+                        .on_hover_text("Click to copy")
+                        .clicked()
+                    {
+                        ui.output().copied_text = url;
+                    }
+                    ui.monospace(format!("size: {}", current_img.size));
+                    ui.monospace(format!("last modified: {}", current_img.last_modified));
+                });
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false; 2])
+                    .max_height(300.0)
+                    .show(ui, |ui| {
+                        if let Some(img) = self.net_images.get_image(current_img.url.clone()) {
+                            let mut size = img.size_vec2();
+                            size *= (ui.available_width() / size.x).min(1.0);
+                            img.show_size(ui, size);
+                        }
+                    });
+            });
+            show_modal.buttons(ui, |ui| {
+                show_modal.suggested_button(ui, "Ok");
+            });
         });
     }
 }
@@ -237,6 +314,7 @@ impl eframe::App for App {
                                     let url = self.oss.get_file_url(d.key.clone());
                                     self.list.push(OssFile {
                                         name: d.key.replace(&self.oss.path, "").replace("/", ""),
+                                        key: d.key.clone(),
                                         url,
                                         size: format!("{}", ByteSize(d.size)),
                                         last_modified: d
@@ -303,6 +381,9 @@ impl eframe::App for App {
                 self.status_bar_contents(ui, ctx);
             });
         });
+
+        self.show_image(ctx);
+        self.dialog.show_dialog();
 
         if !self.dropped_files.is_empty() {
             // for file in &self.dropped_files {
