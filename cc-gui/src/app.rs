@@ -2,8 +2,7 @@ use crate::images::NetworkImages;
 use crate::widgets::item_ui;
 use crate::OssFile;
 use bytesize::ByteSize;
-use cc_core::{tracing, ObjectList, OssConfig, OssError};
-use egui_extras::{Size, TableBuilder};
+use cc_core::{tracing, GetObjectInfo, ObjectList, OssConfig, OssError};
 use egui_modal::{Icon, Modal};
 use std::sync::mpsc;
 use tokio::runtime;
@@ -34,7 +33,6 @@ enum Route {
 pub struct App {
     oss: OssConfig,
     rt: runtime::Runtime,
-    fetcher: Option<ObjectList>,
     list: Vec<OssFile>,
     current_img: OssFile,
     update_tx: mpsc::SyncSender<Update>,
@@ -65,7 +63,6 @@ impl App {
         let mut this = Self {
             oss,
             rt,
-            fetcher: None,
             current_img: OssFile::default(),
             list: vec![],
             update_tx,
@@ -119,47 +116,25 @@ impl App {
         let num_rows = self.list.len();
         let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
 
-        let table = TableBuilder::new(ui)
-            .striped(true)
-            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-            .column(Size::remainder().at_least(60.0))
-            .column(Size::initial(60.0).at_least(40.0))
-            .column(Size::initial(120.0).at_least(80.0))
-            .resizable(true);
-
-        table
-            .header(20.0, |mut header| {
-                header.col(|ui| {
-                    ui.heading("Name");
-                });
-                header.col(|ui| {
-                    ui.heading("Size");
-                });
-                header.col(|ui| {
-                    ui.heading("Last Modified");
-                });
-            })
-            .body(|body| {
-                body.rows(text_height, num_rows, |row_index, mut row| {
-                    let data = self.list.get(row_index).unwrap();
-                    row.col(|ui| {
-                        if ui
-                            .add(egui::Label::new(&data.name).sense(egui::Sense::click()))
-                            .on_hover_text(&data.url)
-                            .clicked()
-                        {
-                            self.current_img = data.clone();
-                            self.preview_modal.open();
-                            ui.ctx().request_repaint();
-                        }
-                    });
-                    row.col(|ui| {
-                        ui.label(&data.size);
-                    });
-                    row.col(|ui| {
-                        ui.label(&data.last_modified);
-                    });
-                });
+        egui::ScrollArea::vertical()
+            .auto_shrink([false; 2])
+            // .enable_scrolling(false)
+            .id_source("content_scroll")
+            .show_rows(ui, text_height, num_rows, |ui, row_range| {
+                for i in row_range {
+                    let data = self.list.get(i).unwrap();
+                    if ui
+                        .add(egui::Label::new(&data.name).sense(egui::Sense::click()))
+                        .on_hover_text(&data.url)
+                        .clicked()
+                    {
+                        self.current_img = data.clone();
+                        self.preview_modal.open();
+                        ui.ctx().request_repaint();
+                    }
+                    // ui.label(&data.size);
+                    // ui.label(&data.last_modified);
+                }
             });
     }
 
@@ -304,24 +279,22 @@ impl eframe::App for App {
                 },
                 Update::List(result) => match result {
                     Ok(str) => {
-                        self.fetcher = Some(str);
-                        match &self.fetcher {
-                            Some(str) => {
-                                for d in &str.object_list {
-                                    let url = self.oss.get_file_url(d.key.clone());
-                                    self.list.push(OssFile {
-                                        name: d.key.replace(&self.oss.path, "").replace("/", ""),
-                                        key: d.key.clone(),
-                                        url,
-                                        size: format!("{}", ByteSize(d.size)),
-                                        last_modified: d
-                                            .last_modified
-                                            .format("%Y-%m-%d %H:%M:%S")
-                                            .to_string(),
-                                    });
-                                }
-                            }
-                            None => {}
+                        for data in str.object_list {
+                            let (base, last_modified, _etag, _typ, size, _storage_class) =
+                                data.pieces();
+                            let key = base.path().to_string();
+                            let url = self.oss.get_file_url(key.clone());
+                            let name = key.replace(&self.oss.path, "").replace("/", "");
+
+                            self.list.push(OssFile {
+                                name,
+                                key,
+                                url,
+                                size: format!("{}", ByteSize(size)),
+                                last_modified: last_modified
+                                    .format("%Y-%m-%d %H:%M:%S")
+                                    .to_string(),
+                            });
                         }
 
                         self.state = State::Idle(Route::List);
