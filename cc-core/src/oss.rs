@@ -1,4 +1,4 @@
-use aliyun_oss_client::{errors::OssError, file::File, object::ObjectList, Client, Query};
+use aliyun_oss_client::{errors::OssError, object::ObjectList, Client, Query};
 use md5;
 use std::ffi::OsStr;
 use std::path::PathBuf;

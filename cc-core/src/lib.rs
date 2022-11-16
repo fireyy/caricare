@@ -1,5 +1,6 @@
 mod oss;
 pub use aliyun_oss_client::{
+    config::GetObjectInfo,
     errors::OssError,
     object::{Object, ObjectList},
 };
