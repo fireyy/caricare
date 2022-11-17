@@ -59,9 +59,9 @@ dependencies = [
 
 [[package]]
 name = "aliyun-oss-client"
-version = "0.9.2"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0cd41f6767d9c4cbed42204f83e92c19782dc7b924f0bf7d77b0c0361bd7097"
+checksum = "f58772c3fa7e5c8675a8d52ef054a69ed56870258cd8c0dba8291a986343c2bc"
 dependencies = [
  "anyhow",
  "async-trait",

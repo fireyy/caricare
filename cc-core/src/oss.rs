@@ -44,6 +44,10 @@ impl OssConfig {
         self.get_bucket_domain() + "/" + &path
     }
 
+    pub fn get_path(&self) -> &String {
+        &self.path
+    }
+
     pub fn client(&self) -> Client {
         let client = aliyun_oss_client::client(
             self.key_id.clone(),
@@ -73,12 +77,8 @@ impl OssConfig {
         result
     }
 
-    pub async fn get_list(&self) -> Result<ObjectList, OssError> {
+    pub async fn get_list(&self, query: Query) -> Result<ObjectList, OssError> {
         let client = self.client();
-        let path = self.path.clone();
-        let mut query = Query::new();
-        query.insert("prefix", path);
-        query.insert("max-keys", "20");
         let result = client.get_object_list(query).await;
         tracing::info!("{:?}", result);
         result
