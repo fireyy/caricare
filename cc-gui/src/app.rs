@@ -48,6 +48,7 @@ pub struct App {
     dialog: Modal,
     loading_more: bool,
     next_query: Option<Query>,
+    scroll_top: bool,
 }
 
 impl App {
@@ -82,6 +83,7 @@ impl App {
             dialog,
             loading_more: false,
             next_query: Some(query),
+            scroll_top: false,
         };
 
         this.get_list(&cc.egui_ctx);
@@ -161,10 +163,17 @@ impl App {
         let num_rows = self.list.len();
         let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
 
-        let (current_scroll, max_scroll) = egui::ScrollArea::both()
+        let mut scroller = egui::ScrollArea::both()
             .auto_shrink([false; 2])
             // .enable_scrolling(false)
-            .id_source("content_scroll")
+            .id_source("content_scroll");
+
+        if self.scroll_top {
+            self.scroll_top = false;
+            scroller = scroller.scroll_offset(egui::Vec2::ZERO);
+        }
+
+        let (current_scroll, max_scroll) = scroller
             .show_rows(ui, text_height, num_rows, |ui, row_range| {
                 for i in row_range {
                     let data = self.list.get(i).unwrap();
@@ -251,10 +260,11 @@ impl App {
             self.state != State::Busy(Route::List) && self.state != State::Busy(Route::Upload);
         ui.add_enabled_ui(enabled, |ui| {
             if ui.button("\u{1f503}").clicked() {
-                // let query = Self::build_query(self.oss.path.clone());
-                // self.next_query = Some(query);
-                // self.list = vec![];
-                // self.get_list(ctx);
+                self.scroll_top = true;
+                let query = Self::build_query(self.oss.path.clone());
+                self.next_query = Some(query);
+                self.list = vec![];
+                self.get_list(ctx);
             }
         });
         ui.label(format!("List({})", self.list.len()));
