@@ -1,28 +1,7 @@
 use crate::images::NetworkImages;
+use crate::theme::text_ellipsis;
 use crate::OssFile;
-use eframe::epaint::text::{LayoutJob, TextWrapping};
-use egui::{Align, Color32, RichText, TextFormat};
-
-fn text_ellipsis(name: &str, text_color: Color32, max_rows: usize) -> LayoutJob {
-    let mut job = LayoutJob::single_section(
-        name.to_string(),
-        TextFormat {
-            color: text_color,
-
-            valign: Align::Center,
-            ..TextFormat::default()
-        },
-    );
-
-    job.wrap = TextWrapping {
-        max_rows,
-        break_anywhere: true,
-        overflow_character: Some('…'),
-        ..TextWrapping::default()
-    };
-
-    job
-}
+use egui::RichText;
 
 pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &NetworkImages) -> egui::Response {
     let initial_size = egui::vec2(200.0, 50.0);
@@ -49,11 +28,7 @@ pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &NetworkImages) -> egui
                         }
                     });
                     ui.vertical(|ui| {
-                        ui.label(text_ellipsis(
-                            &data.name,
-                            ui.style().visuals.strong_text_color(),
-                            1,
-                        ));
+                        ui.label(text_ellipsis(&data.name, 1));
                         ui.label(
                             RichText::new(data.size).color(ui.style().visuals.weak_text_color()),
                         );

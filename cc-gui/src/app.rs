@@ -1,10 +1,11 @@
 use crate::images::NetworkImages;
+use crate::theme::text_ellipsis;
 use crate::widgets::item_ui;
 use crate::OssFile;
 use bytesize::ByteSize;
-use cc_core::{tracing, GetObjectInfo, ObjectList, OssConfig, OssError};
+use cc_core::{tracing, GetObjectInfo, ObjectList, OssConfig, OssError, Query};
 use egui_modal::{Icon, Modal};
-use std::sync::mpsc;
+use std::{sync::mpsc, vec};
 use tokio::runtime;
 
 enum Update {
@@ -45,6 +46,8 @@ pub struct App {
     show_type: ShowType,
     preview_modal: Modal,
     dialog: Modal,
+    loading_more: bool,
+    next_query: Option<Query>,
 }
 
 impl App {
@@ -59,6 +62,8 @@ impl App {
         let preview_modal = Modal::new(&cc.egui_ctx, "preview");
 
         let dialog = Modal::new(&cc.egui_ctx, "my_dialog");
+
+        let query = Self::build_query(oss.path.clone());
 
         let mut this = Self {
             oss,
@@ -75,11 +80,20 @@ impl App {
             show_type: ShowType::List,
             preview_modal,
             dialog,
+            loading_more: false,
+            next_query: Some(query),
         };
 
         this.get_list(&cc.egui_ctx);
 
         this
+    }
+
+    fn build_query(path: String) -> Query {
+        let mut query = Query::new();
+        query.insert("prefix", path);
+        query.insert("max-keys", "40");
+        query
     }
 
     fn upload_file(&mut self, ctx: &egui::Context) {
@@ -91,7 +105,7 @@ impl App {
             let ctx = ctx.clone();
             let oss = self.oss.clone();
 
-            self.rt.spawn(async move {
+            self.rt.block_on(async move {
                 let res = oss.put(picked_path).await;
                 update_tx.send(Update::Uploaded(res)).unwrap();
                 ctx.request_repaint();
@@ -100,42 +114,106 @@ impl App {
     }
 
     fn get_list(&mut self, ctx: &egui::Context) {
-        self.state = State::Busy(Route::List);
-        let update_tx = self.update_tx.clone();
-        let ctx = ctx.clone();
-        let oss = self.oss.clone();
+        if let Some(query) = self.next_query.clone() {
+            if !self.loading_more {
+                self.state = State::Busy(Route::List);
+            }
+            let update_tx = self.update_tx.clone();
+            let ctx = ctx.clone();
+            let oss = self.oss.clone();
+            self.rt.block_on(async move {
+                let res = oss.get_list(query).await;
+                update_tx.send(Update::List(res)).unwrap();
+                ctx.request_repaint();
+            });
+        }
+    }
 
-        self.rt.block_on(async move {
-            let res = oss.get_list().await;
-            update_tx.send(Update::List(res)).unwrap();
-            ctx.request_repaint();
-        });
+    fn set_list(&mut self, obj: ObjectList) {
+        let mut list = vec![];
+        for data in obj.object_list {
+            let (base, last_modified, _etag, _typ, size, _storage_class) = data.pieces();
+            let key = base.path().to_string();
+            let url = self.oss.get_file_url(key.clone());
+            let name = key.replace(&self.oss.path, "").replace("/", "");
+
+            list.push(OssFile {
+                name,
+                key,
+                url,
+                size: format!("{}", ByteSize(size)),
+                last_modified: last_modified.format("%Y-%m-%d %H:%M:%S").to_string(),
+            });
+        }
+        self.list.append(&mut list);
+    }
+
+    fn load_more(&mut self, ctx: &egui::Context) {
+        tracing::info!("load more!");
+        if self.next_query.is_some() {
+            self.get_list(ctx);
+        } else {
+            //no more
+        }
     }
 
     fn render_list(&mut self, ui: &mut egui::Ui) {
         let num_rows = self.list.len();
         let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
 
-        egui::ScrollArea::vertical()
+        let (current_scroll, max_scroll) = egui::ScrollArea::both()
             .auto_shrink([false; 2])
             // .enable_scrolling(false)
             .id_source("content_scroll")
             .show_rows(ui, text_height, num_rows, |ui, row_range| {
                 for i in row_range {
                     let data = self.list.get(i).unwrap();
-                    if ui
-                        .add(egui::Label::new(&data.name).sense(egui::Sense::click()))
-                        .on_hover_text(&data.url)
-                        .clicked()
-                    {
-                        self.current_img = data.clone();
-                        self.preview_modal.open();
-                        ui.ctx().request_repaint();
-                    }
-                    // ui.label(&data.size);
-                    // ui.label(&data.last_modified);
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                        egui::Frame::none().show(ui, |ui| {
+                            ui.set_width(120.);
+                            ui.label(&data.last_modified);
+                        });
+                        egui::Frame::none().show(ui, |ui| {
+                            ui.set_width(60.);
+                            ui.label(&data.size);
+                        });
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                            ui.vertical(|ui| {
+                                if ui
+                                    .add(
+                                        egui::Label::new(text_ellipsis(&data.name, 1))
+                                            .sense(egui::Sense::click()),
+                                    )
+                                    .on_hover_text(&data.url)
+                                    .clicked()
+                                {
+                                    self.current_img = data.clone();
+                                    self.preview_modal.open();
+                                    ui.ctx().request_repaint();
+                                }
+                            });
+                        });
+                    });
                 }
-            });
+                let margin = ui.visuals().clip_rect_margin;
+                let current_scroll = ui.clip_rect().top() - ui.min_rect().top() + margin;
+                let max_scroll = ui.min_rect().height() - ui.clip_rect().height() + 2.0 * margin;
+                (current_scroll, max_scroll)
+            })
+            .inner;
+
+        if self.next_query.is_some() && current_scroll == max_scroll && !self.loading_more {
+            self.loading_more = true;
+            self.load_more(ui.ctx());
+        }
+
+        if self.loading_more {
+            ui.spinner();
+        }
+
+        if self.next_query.is_none() && !self.loading_more {
+            ui.label("No More Data.");
+        }
     }
 
     fn render_thumb(&mut self, ui: &mut egui::Ui) {
@@ -173,9 +251,13 @@ impl App {
             self.state != State::Busy(Route::List) && self.state != State::Busy(Route::Upload);
         ui.add_enabled_ui(enabled, |ui| {
             if ui.button("\u{1f503}").clicked() {
-                self.get_list(ctx);
+                // let query = Self::build_query(self.oss.path.clone());
+                // self.next_query = Some(query);
+                // self.list = vec![];
+                // self.get_list(ctx);
             }
         });
+        ui.label(format!("List({})", self.list.len()));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
             ui.style_mut().spacing.item_spacing.x = 0.0;
             egui::Frame {
@@ -279,24 +361,9 @@ impl eframe::App for App {
                 },
                 Update::List(result) => match result {
                     Ok(str) => {
-                        for data in str.object_list {
-                            let (base, last_modified, _etag, _typ, size, _storage_class) =
-                                data.pieces();
-                            let key = base.path().to_string();
-                            let url = self.oss.get_file_url(key.clone());
-                            let name = key.replace(&self.oss.path, "").replace("/", "");
-
-                            self.list.push(OssFile {
-                                name,
-                                key,
-                                url,
-                                size: format!("{}", ByteSize(size)),
-                                last_modified: last_modified
-                                    .format("%Y-%m-%d %H:%M:%S")
-                                    .to_string(),
-                            });
-                        }
-
+                        self.next_query = str.next_query();
+                        self.set_list(str);
+                        self.loading_more = false;
                         self.state = State::Idle(Route::List);
                     }
                     Err(err) => {

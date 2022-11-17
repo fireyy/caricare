@@ -2,6 +2,7 @@ use cc_core::setup_tracing;
 
 mod app;
 mod images;
+mod theme;
 mod widgets;
 
 #[derive(Clone, Default)]
