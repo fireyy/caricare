@@ -71,6 +71,7 @@ impl NetworkImages {
             .unwrap_or_else(Uuid::new_v4);
 
         Image {
+            //TODO: 移除 uuid，使用 url 作为唯一
             id: uuid,
             kind: ImageKind::Display,
             url,

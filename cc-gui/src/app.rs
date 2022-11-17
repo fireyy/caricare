@@ -8,6 +8,9 @@ use egui_modal::{Icon, Modal};
 use std::{sync::mpsc, vec};
 use tokio::runtime;
 
+static THUMB_LIST_WIDTH: f32 = 200.0;
+static THUMB_LIST_HEIGHT: f32 = 50.0;
+
 enum Update {
     Uploaded(Result<String, OssError>),
     List(Result<ObjectList, OssError>),
@@ -159,13 +162,29 @@ impl App {
         }
     }
 
-    fn render_list(&mut self, ui: &mut egui::Ui) {
-        let num_rows = self.list.len();
-        let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
+    fn render_content(&mut self, ui: &mut egui::Ui) {
+        let num_cols = match self.show_type {
+            ShowType::List => 1,
+            ShowType::Thumb => {
+                let w = ui.ctx().input().screen_rect().size();
+                (w.x / THUMB_LIST_WIDTH) as usize
+            }
+        };
+        let num_rows = match self.show_type {
+            ShowType::List => self.list.len(),
+            ShowType::Thumb => (self.list.len() as f32 / num_cols as f32).ceil() as usize,
+        };
+        // tracing::info!("num_rows: {}", num_rows);
+        let row_height = match self.show_type {
+            ShowType::List => ui.text_style_height(&egui::TextStyle::Body),
+            ShowType::Thumb => THUMB_LIST_HEIGHT,
+        };
 
-        let mut scroller = egui::ScrollArea::both()
+        let mut scroller = egui::ScrollArea::vertical()
+            .id_source("scroller_".to_owned() + &row_height.to_string())
             .auto_shrink([false; 2])
             // .enable_scrolling(false)
+            // .hscroll(self.show_type == ShowType::List)
             .id_source("content_scroll");
 
         if self.scroll_top {
@@ -174,35 +193,11 @@ impl App {
         }
 
         let (current_scroll, max_scroll) = scroller
-            .show_rows(ui, text_height, num_rows, |ui, row_range| {
-                for i in row_range {
-                    let data = self.list.get(i).unwrap();
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                        egui::Frame::none().show(ui, |ui| {
-                            ui.set_width(120.);
-                            ui.label(&data.last_modified);
-                        });
-                        egui::Frame::none().show(ui, |ui| {
-                            ui.set_width(60.);
-                            ui.label(&data.size);
-                        });
-                        ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                            ui.vertical(|ui| {
-                                if ui
-                                    .add(
-                                        egui::Label::new(text_ellipsis(&data.name, 1))
-                                            .sense(egui::Sense::click()),
-                                    )
-                                    .on_hover_text(&data.url)
-                                    .clicked()
-                                {
-                                    self.current_img = data.clone();
-                                    self.preview_modal.open();
-                                    ui.ctx().request_repaint();
-                                }
-                            });
-                        });
-                    });
+            .show_rows(ui, row_height, num_rows, |ui, row_range| {
+                // tracing::info!("row_range: {:?}", row_range);
+                match self.show_type {
+                    ShowType::List => self.render_list(ui, row_range),
+                    ShowType::Thumb => self.render_thumb(ui, row_range, num_cols),
                 }
                 let margin = ui.visuals().clip_rect_margin;
                 let current_scroll = ui.clip_rect().top() - ui.min_rect().top() + margin;
@@ -211,33 +206,69 @@ impl App {
             })
             .inner;
 
-        if self.next_query.is_some() && current_scroll == max_scroll && !self.loading_more {
+        // tracing::info!(
+        //     "current_scroll: {}, max_scroll: {}",
+        //     current_scroll,
+        //     max_scroll
+        // );
+
+        if self.next_query.is_some() && current_scroll >= max_scroll && !self.loading_more {
             self.loading_more = true;
             self.load_more(ui.ctx());
         }
+    }
 
-        if self.loading_more {
-            ui.spinner();
-        }
-
-        if self.next_query.is_none() && !self.loading_more {
-            ui.label("No More Data.");
+    fn render_list(&mut self, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
+        for i in row_range {
+            let data = self.list.get(i).unwrap();
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                egui::Frame::none().show(ui, |ui| {
+                    ui.set_width(120.);
+                    ui.label(&data.last_modified);
+                });
+                egui::Frame::none().show(ui, |ui| {
+                    ui.set_width(60.);
+                    ui.label(&data.size);
+                });
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                    ui.vertical(|ui| {
+                        if ui
+                            .add(
+                                egui::Label::new(text_ellipsis(&data.name, 1))
+                                    .sense(egui::Sense::click()),
+                            )
+                            .on_hover_text(&data.url)
+                            .clicked()
+                        {
+                            self.current_img = data.clone();
+                            self.preview_modal.open();
+                            ui.ctx().request_repaint();
+                        }
+                    });
+                });
+            });
         }
     }
 
-    fn render_thumb(&mut self, ui: &mut egui::Ui) {
-        egui::ScrollArea::vertical()
-            .auto_shrink([false; 2])
-            // .enable_scrolling(false)
-            .id_source("content_scroll")
+    fn render_thumb(
+        &mut self,
+        ui: &mut egui::Ui,
+        row_range: std::ops::Range<usize>,
+        num_cols: usize,
+    ) {
+        egui::Grid::new(format!("grid"))
+            .num_columns(num_cols)
+            .max_col_width(THUMB_LIST_WIDTH)
+            .min_col_width(THUMB_LIST_WIDTH)
+            .min_row_height(THUMB_LIST_HEIGHT)
+            .spacing(egui::Vec2::ZERO)
+            .start_row(row_range.start)
             .show(ui, |ui| {
-                ui.with_layout(
-                    egui::Layout::left_to_right(egui::Align::TOP).with_main_wrap(true),
-                    |ui| {
-                        // ui.spacing_mut().item_spacing.x = 0.0;
-                        for d in &self.list {
+                for i in row_range {
+                    for j in 0..num_cols {
+                        if let Some(d) = self.list.get(j + i * num_cols) {
                             let url = d.url.clone();
-                            self.net_images.add(url.clone());
+                            // self.net_images.add(url.clone());
                             let resp = item_ui(ui, d.clone(), &self.net_images);
                             if resp.on_hover_text(url).clicked() {
                                 self.current_img = d.clone();
@@ -245,27 +276,33 @@ impl App {
                                 ui.ctx().request_repaint();
                             }
                         }
-                    },
-                );
+                    }
+                    ui.end_row();
+                }
             });
     }
 
-    fn bar_contents(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn bar_contents(&mut self, ui: &mut egui::Ui) {
         if ui.button("Upload file...").clicked() {
             if let Some(path) = rfd::FileDialog::new().pick_file() {
                 self.picked_path = Some(path.display().to_string());
             }
         }
-        let enabled =
-            self.state != State::Busy(Route::List) && self.state != State::Busy(Route::Upload);
-        ui.add_enabled_ui(enabled, |ui| {
-            if ui.button("\u{1f503}").clicked() {
-                self.scroll_top = true;
-                let query = Self::build_query(self.oss.path.clone());
-                self.next_query = Some(query);
-                self.list = vec![];
-                self.get_list(ctx);
-            }
+        ui.horizontal(|ui| {
+            ui.set_width(25.0);
+            let enabled = self.state != State::Busy(Route::List)
+                && self.state != State::Busy(Route::Upload)
+                && !self.loading_more;
+
+            ui.add_enabled_ui(enabled, |ui| {
+                if ui.button("\u{1f503}").clicked() {
+                    self.scroll_top = true;
+                    let query = Self::build_query(self.oss.path.clone());
+                    self.next_query = Some(query);
+                    self.list = vec![];
+                    self.get_list(ui.ctx());
+                }
+            });
         });
         ui.label(format!("List({})", self.list.len()));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
@@ -278,13 +315,31 @@ impl App {
             .show(ui, |ui| {
                 ui.style_mut().visuals.button_frame = false;
                 ui.style_mut().visuals.widgets.active.rounding = egui::Rounding::same(2.0);
-                ui.selectable_value(&mut self.show_type, ShowType::Thumb, "\u{25a3}");
-                ui.selectable_value(&mut self.show_type, ShowType::List, "\u{2630}");
+                if ui
+                    .selectable_value(&mut self.show_type, ShowType::Thumb, "\u{25a3}")
+                    .clicked()
+                {
+                    self.scroll_top = true;
+                }
+                if ui
+                    .selectable_value(&mut self.show_type, ShowType::List, "\u{2630}")
+                    .clicked()
+                {
+                    self.scroll_top = true;
+                }
             });
         });
     }
-    fn status_bar_contents(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
+    fn status_bar_contents(&mut self, ui: &mut egui::Ui) {
         egui::widgets::global_dark_light_mode_switch(ui);
+
+        if self.loading_more {
+            ui.add(egui::Spinner::new().size(12.0));
+        }
+
+        if self.next_query.is_none() && !self.loading_more {
+            ui.label("No More Data.");
+        }
 
         if let Some(err) = &self.err {
             ui.label(egui::RichText::new(err).color(egui::Color32::RED));
@@ -389,7 +444,7 @@ impl eframe::App for App {
                 .inner_margin(egui::style::Margin::symmetric(0.0, 5.0))
                 .show(ui, |ui| {
                     ui.horizontal_wrapped(|ui| {
-                        self.bar_contents(ui, ctx);
+                        self.bar_contents(ui);
                     });
                 });
         });
@@ -397,7 +452,7 @@ impl eframe::App for App {
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.visuals_mut().button_frame = false;
-                self.status_bar_contents(ui, ctx);
+                self.status_bar_contents(ui);
             });
         });
 
@@ -410,10 +465,7 @@ impl eframe::App for App {
                             Route::Upload => {
                                 //
                             }
-                            Route::List => match self.show_type {
-                                ShowType::List => self.render_list(ui),
-                                ShowType::Thumb => self.render_thumb(ui),
-                            },
+                            Route::List => self.render_content(ui),
                         },
                         State::Busy(route) => {
                             ui.centered_and_justified(|ui| match route {
