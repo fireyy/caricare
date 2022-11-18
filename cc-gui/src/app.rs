@@ -3,16 +3,18 @@ use crate::widgets::item_ui;
 use crate::OssFile;
 use bytesize::ByteSize;
 use cc_core::{
-    tokio, tracing, GetObjectInfo, ImageCache, ImageFetcher, ObjectList, OssConfig, OssError, Query,
+    tokio, tracing, GetObjectInfo, ImageCache, ImageFetcher, ObjectList, OssConfig, OssError,
+    Query, UploadResult,
 };
-use egui_modal::{Icon, Modal};
-use std::{sync::mpsc, vec};
+use egui_modal::Modal;
+use std::{path::PathBuf, sync::mpsc, vec};
 
 static THUMB_LIST_WIDTH: f32 = 200.0;
 static THUMB_LIST_HEIGHT: f32 = 50.0;
+static SUPPORT_EXTENSIONS: [&str; 4] = ["png", "gif", "jpg", "svg"];
 
 enum Update {
-    Uploaded(Result<String, OssError>),
+    Uploaded(Result<Vec<UploadResult>, OssError>),
     List(Result<ObjectList, OssError>),
 }
 
@@ -43,7 +45,7 @@ pub struct App {
     state: State,
     err: Option<String>,
     dropped_files: Vec<egui::DroppedFile>,
-    picked_path: Option<String>,
+    picked_path: Vec<PathBuf>,
     show_type: ShowType,
     preview_modal: Modal,
     dialog: Modal,
@@ -51,6 +53,8 @@ pub struct App {
     next_query: Option<Query>,
     scroll_top: bool,
     images: ImageCache,
+    upload_result: Vec<UploadResult>,
+    is_show_result: bool,
 }
 
 impl App {
@@ -75,7 +79,7 @@ impl App {
             state: State::Idle(Route::List),
             err: None,
             dropped_files: vec![],
-            picked_path: None,
+            picked_path: vec![],
             show_type: ShowType::List,
             preview_modal,
             dialog,
@@ -83,6 +87,8 @@ impl App {
             next_query: Some(query),
             scroll_top: false,
             images,
+            upload_result: vec![],
+            is_show_result: false,
         };
 
         this.get_list(&cc.egui_ctx);
@@ -98,22 +104,24 @@ impl App {
     }
 
     fn upload_file(&mut self, ctx: &egui::Context) {
-        if let Some(picked_path) = self.picked_path.clone() {
-            self.picked_path = None;
-            self.state = State::Busy(Route::Upload);
-
-            let update_tx = self.update_tx.clone();
-            let ctx = ctx.clone();
-            let oss = self.oss.clone();
-
-            cc_core::runtime::spawn(async move {
-                tokio::spawn(async move {
-                    let res = oss.put(picked_path).await;
-                    update_tx.send(Update::Uploaded(res)).unwrap();
-                    ctx.request_repaint();
-                });
-            });
+        if self.picked_path.is_empty() {
+            return;
         }
+        let picked_path = self.picked_path.clone();
+        self.picked_path = vec![];
+        self.state = State::Busy(Route::Upload);
+
+        let update_tx = self.update_tx.clone();
+        let ctx = ctx.clone();
+        let oss = self.oss.clone();
+
+        cc_core::runtime::spawn(async move {
+            tokio::spawn(async move {
+                let res = oss.put_multi(picked_path).await;
+                update_tx.send(Update::Uploaded(res)).unwrap();
+                ctx.request_repaint();
+            });
+        });
     }
 
     fn get_list(&mut self, ctx: &egui::Context) {
@@ -284,8 +292,11 @@ impl App {
 
     fn bar_contents(&mut self, ui: &mut egui::Ui) {
         if ui.button("Upload file...").clicked() {
-            if let Some(path) = rfd::FileDialog::new().pick_file() {
-                self.picked_path = Some(path.display().to_string());
+            if let Some(paths) = rfd::FileDialog::new()
+                .add_filter("image", &SUPPORT_EXTENSIONS)
+                .pick_files()
+            {
+                self.picked_path = paths;
             }
         }
         ui.horizontal(|ui| {
@@ -345,13 +356,24 @@ impl App {
             ui.label(egui::RichText::new(err).color(egui::Color32::RED));
         }
 
+        let style = &ui.style().visuals;
+        let color = if self.is_show_result {
+            style.hyperlink_color
+        } else {
+            style.text_color()
+        };
+
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-            if ui.button("\u{1f4ac}").clicked() {
-                self.dialog.open_dialog(
-                    Some("Info"),       // title
-                    Some("Working..."), // body
-                    Some(Icon::Info),   // icon
-                )
+            if ui
+                .button(egui::RichText::new("\u{1f4ac}").color(color))
+                .clicked()
+            {
+                self.is_show_result = !self.is_show_result;
+                // self.dialog.open_dialog(
+                //     Some("Info"),       // title
+                //     Some("Working..."), // body
+                //     Some(Icon::Info),   // icon
+                // )
             }
         });
     }
@@ -406,6 +428,35 @@ impl App {
             });
         });
     }
+    fn show_result(&mut self, ctx: &egui::Context) {
+        if self.is_show_result {
+            egui::Area::new("result")
+                .order(egui::Order::Foreground)
+                .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    egui::Frame::none()
+                        .fill(ui.style().visuals.extreme_bg_color)
+                        .inner_margin(ui.style().spacing.window_margin)
+                        .show(ui, |ui| {
+                            ui.set_width(400.0);
+                            ui.heading("Result");
+                            ui.spacing();
+                            for path in &self.upload_result {
+                                match path {
+                                    UploadResult::Success(str) => ui.label(
+                                        egui::RichText::new(format!("\u{2714} {str}"))
+                                            .color(egui::Color32::GREEN),
+                                    ),
+                                    UploadResult::Error(str) => ui.label(
+                                        egui::RichText::new(format!("\u{2716} {str}"))
+                                            .color(egui::Color32::RED),
+                                    ),
+                                };
+                            }
+                        });
+                });
+        }
+    }
 }
 
 impl eframe::App for App {
@@ -415,8 +466,9 @@ impl eframe::App for App {
             match update {
                 Update::Uploaded(result) => match result {
                     Ok(str) => {
-                        self.state = State::Idle(Route::Upload);
-                        tracing::info!("{}", str);
+                        self.state = State::Idle(Route::List);
+                        self.upload_result = str;
+                        self.is_show_result = true;
                     }
                     Err(err) => {
                         self.state = State::Idle(Route::Upload);
@@ -461,9 +513,7 @@ impl eframe::App for App {
                 .show(ui, |ui| {
                     match &mut self.state {
                         State::Idle(ref mut route) => match route {
-                            Route::Upload => {
-                                //
-                            }
+                            Route::Upload => {}
                             Route::List => self.render_content(ui),
                         },
                         State::Busy(route) => {
@@ -484,20 +534,17 @@ impl eframe::App for App {
 
         self.show_image(ctx);
         self.dialog.show_dialog();
+        self.show_result(ctx);
 
         if !self.dropped_files.is_empty() {
-            // for file in &self.dropped_files {
+            let mut files = vec![];
+            for file in &self.dropped_files {
+                if let Some(path) = &file.path {
+                    files.push(path.clone());
+                }
+            }
 
-            // }
-            let file = self.dropped_files.first().unwrap();
-            let info = if let Some(path) = &file.path {
-                path.display().to_string()
-            } else if !file.name.is_empty() {
-                file.name.clone()
-            } else {
-                "???".to_owned()
-            };
-            self.picked_path = Some(info);
+            self.picked_path = files;
         }
 
         self.upload_file(ctx);

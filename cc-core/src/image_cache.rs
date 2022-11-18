@@ -129,7 +129,13 @@ impl ImageFetcher {
             }
             image::ImageFormat::Jpeg => Self::load_retained_image(url, &data).map(Image::Static)?,
             image::ImageFormat::Gif => AnimatedImage::load_gif(url, &data).map(Image::Animated)?,
-            fmt => anyhow::bail!("unsupported format for '{url}': {fmt:?}"),
+            fmt => {
+                if guess_svg(&data[..data.len().min(128)]) {
+                    Self::load_svg(url, &data).map(Image::Static)?
+                } else {
+                    anyhow::bail!("unsupported format for '{url}': {fmt:?}")
+                }
+            }
         };
 
         Ok(img)
@@ -139,6 +145,15 @@ impl ImageFetcher {
         RetainedImage::from_image_bytes(url, data)
             .map_err(|err| anyhow::anyhow!("cannot load '{url}': {err}"))
     }
+
+    fn load_svg(url: &str, data: &[u8]) -> anyhow::Result<egui_extras::RetainedImage> {
+        RetainedImage::from_svg_bytes(url, data)
+            .map_err(|err| anyhow::anyhow!("cannot load '{url}': {err}"))
+    }
+}
+
+fn guess_svg(buffer: &[u8]) -> bool {
+    buffer.starts_with(b"3c3f786d6c")
 }
 
 pub enum Image {

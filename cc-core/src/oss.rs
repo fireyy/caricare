@@ -3,8 +3,12 @@ use md5;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
-#[derive(Default, Debug, Clone)]
+pub enum UploadResult {
+    Success(String),
+    Error(String),
+}
 
+#[derive(Default, Debug, Clone)]
 pub struct OssConfig {
     pub key_id: String,
     pub key_secret: String,
@@ -59,8 +63,8 @@ impl OssConfig {
         client
     }
 
-    pub async fn put(&self, path: String) -> Result<String, OssError> {
-        let path = PathBuf::from(path);
+    pub async fn put(&self, path: PathBuf) -> Result<String, OssError> {
+        // let path = PathBuf::from(path);
         let path_clone = path.clone();
         let bucket_path = self.path.clone();
         let ext = path_clone.extension().and_then(OsStr::to_str).unwrap();
@@ -75,6 +79,18 @@ impl OssConfig {
             .put_content(file_content, &key, get_content_type)
             .await;
         result
+    }
+
+    pub async fn put_multi(&self, paths: Vec<PathBuf>) -> Result<Vec<UploadResult>, OssError> {
+        let mut results = vec![];
+        for path in paths {
+            match self.put(path).await {
+                Ok(str) => results.push(UploadResult::Success(str)),
+                Err(err) => results.push(UploadResult::Error(err.message())),
+            }
+        }
+
+        Ok(results)
     }
 
     pub async fn get_list(&self, query: Query) -> Result<ObjectList, OssError> {

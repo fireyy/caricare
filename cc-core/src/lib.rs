@@ -8,7 +8,7 @@ pub use aliyun_oss_client::{
     Query,
 };
 pub use image_cache::{ImageCache, ImageFetcher};
-pub use oss::OssConfig;
+pub use oss::{OssConfig, UploadResult};
 pub use tokio;
 pub use tracing;
 
