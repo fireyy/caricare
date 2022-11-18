@@ -538,7 +538,9 @@ impl eframe::App for App {
 
         if !self.dropped_files.is_empty() {
             let mut files = vec![];
-            for file in &self.dropped_files {
+            let dropped_files = self.dropped_files.clone();
+            self.dropped_files = vec![];
+            for file in dropped_files {
                 if let Some(path) = &file.path {
                     files.push(path.clone());
                 }
