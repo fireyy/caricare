@@ -1,9 +1,9 @@
-use crate::images::NetworkImages;
 use crate::theme::text_ellipsis;
 use crate::widgets::item_ui;
 use crate::OssFile;
 use bytesize::ByteSize;
 use cc_core::{tracing, GetObjectInfo, ObjectList, OssConfig, OssError, Query};
+use cc_image_cache::{ImageCache, ImageFetcher};
 use egui_modal::{Icon, Modal};
 use std::{sync::mpsc, vec};
 use tokio::runtime;
@@ -45,13 +45,13 @@ pub struct App {
     err: Option<String>,
     dropped_files: Vec<egui::DroppedFile>,
     picked_path: Option<String>,
-    net_images: NetworkImages,
     show_type: ShowType,
     preview_modal: Modal,
     dialog: Modal,
     loading_more: bool,
     next_query: Option<Query>,
     scroll_top: bool,
+    images: ImageCache,
 }
 
 impl App {
@@ -69,6 +69,8 @@ impl App {
 
         let query = Self::build_query(oss.path.clone());
 
+        let images = ImageCache::new(ImageFetcher::spawn(cc.egui_ctx.clone()));
+
         let mut this = Self {
             oss,
             rt,
@@ -80,13 +82,13 @@ impl App {
             err: None,
             dropped_files: vec![],
             picked_path: None,
-            net_images: NetworkImages::new(cc.egui_ctx.clone()),
             show_type: ShowType::List,
             preview_modal,
             dialog,
             loading_more: false,
             next_query: Some(query),
             scroll_top: false,
+            images,
         };
 
         this.get_list(&cc.egui_ctx);
@@ -268,8 +270,7 @@ impl App {
                     for j in 0..num_cols {
                         if let Some(d) = self.list.get(j + i * num_cols) {
                             let url = d.url.clone();
-                            // self.net_images.add(url.clone());
-                            let resp = item_ui(ui, d.clone(), &self.net_images);
+                            let resp = item_ui(ui, d.clone(), &mut self.images);
                             if resp.on_hover_text(url).clicked() {
                                 self.current_img = d.clone();
                                 self.preview_modal.open();
@@ -367,8 +368,6 @@ impl App {
             return;
         }
 
-        self.net_images.add(current_img.url.clone());
-
         show_modal.show(|ui| {
             show_modal.title(ui, "Preview");
             show_modal.frame(ui, |ui| {
@@ -396,7 +395,7 @@ impl App {
                     .auto_shrink([false; 2])
                     .max_height(win_size.y - 200.0)
                     .show(ui, |ui| {
-                        if let Some(img) = self.net_images.get_image(current_img.url.clone()) {
+                        if let Some(img) = self.images.get(&current_img.url) {
                             let mut size = img.size_vec2();
                             size *= (ui.available_width() / size.x).min(1.0);
                             img.show_size(ui, size);
@@ -412,6 +411,7 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.images.poll();
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
                 Update::Uploaded(result) => match result {
@@ -506,7 +506,5 @@ impl eframe::App for App {
         if !ctx.input().raw.dropped_files.is_empty() {
             self.dropped_files = ctx.input().raw.dropped_files.clone();
         }
-
-        self.net_images.try_fetch();
     }
 }

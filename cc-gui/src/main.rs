@@ -1,7 +1,7 @@
 use cc_core::setup_tracing;
+use cc_image_cache::runtime;
 
 mod app;
-mod images;
 mod theme;
 mod widgets;
 
@@ -16,6 +16,8 @@ pub struct OssFile {
 
 fn main() {
     setup_tracing();
+
+    runtime::start().unwrap();
 
     eframe::run_native(
         "Caricare",

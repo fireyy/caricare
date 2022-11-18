@@ -1,9 +1,9 @@
-use crate::images::NetworkImages;
 use crate::theme::text_ellipsis;
 use crate::OssFile;
+use cc_image_cache::ImageCache;
 use egui::RichText;
 
-pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &NetworkImages) -> egui::Response {
+pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &mut ImageCache) -> egui::Response {
     let response = egui::Frame {
         inner_margin: egui::style::Margin::same(5.0),
         outer_margin: egui::style::Margin::same(0.0),
@@ -19,10 +19,10 @@ pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &NetworkImages) -> egui
             .show(ui, |ui| {
                 ui.set_width(32.0);
                 ui.set_height(32.0);
-                // if let Some(img) = images.get_image(data.url) {
-                //     let size = egui::vec2(32.0, 32.0);
-                //     img.show_size(ui, size);
-                // }
+                if let Some(img) = images.get(&data.url) {
+                    let size = egui::vec2(32.0, 32.0);
+                    img.show_size(ui, size);
+                }
             });
             ui.vertical(|ui| {
                 ui.label(text_ellipsis(&data.name, 1));

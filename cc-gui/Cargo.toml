@@ -7,13 +7,14 @@ edition = "2021"
 
 [dependencies]
 cc-core = { path="../cc-core" }
+cc-image-cache = { path="../cc-image-cache" }
 eframe = { version = "0.19.0", features = ["dark-light", "persistence"] }
 egui = "0.19.0"
 egui_extras = { version = "0.19.0", features = ["image"] }
 image = { version = "0.24.3", default-features = false, features = ["png", "jpeg"] }
 rfd = "0.10"
 tokio = { version = "1", features = ["rt-multi-thread"] }
-cached_network_image = "1.0"
-directories = "4.0"
 bytesize = "1.1.0"
 egui-modal = "0.1"
+flume = "0.10.14"
+anyhow = "1.0.66"

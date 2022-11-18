@@ -2,6 +2,7 @@
 members = [
     "cc-core",
     "cc-gui",
+    "cc-image-cache"
 ]
 
 [profile.dev]
