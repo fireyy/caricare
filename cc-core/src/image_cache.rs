@@ -113,32 +113,35 @@ impl ImageFetcher {
     }
 
     fn load_image(url: &str, data: Vec<u8>) -> anyhow::Result<Image> {
-        let img = match image::guess_format(&data[..data.len().min(128)])
-            .map_err(|err| anyhow::anyhow!("cannot guess format for '{url}': {err}"))?
-        {
-            image::ImageFormat::Png => {
-                let dec = image::codecs::png::PngDecoder::new(&*data).map_err(|err| {
-                    anyhow::anyhow!("expected png, got something else for '{url}': {err}")
-                })?;
+        // Check is svg
+        if guess_svg(&data[..data.len().min(128)]) {
+            Ok(Self::load_svg(url, &data).map(Image::Static)?)
+        } else {
+            let img = match image::guess_format(&data[..data.len().min(128)])
+                .map_err(|err| anyhow::anyhow!("cannot guess format for '{url}': {err}"))?
+            {
+                image::ImageFormat::Png => {
+                    let dec = image::codecs::png::PngDecoder::new(&*data).map_err(|err| {
+                        anyhow::anyhow!("expected png, got something else for '{url}': {err}")
+                    })?;
 
-                if dec.is_apng() {
-                    AnimatedImage::load_apng(url, &data).map(Image::Animated)?
-                } else {
+                    if dec.is_apng() {
+                        AnimatedImage::load_apng(url, &data).map(Image::Animated)?
+                    } else {
+                        Self::load_retained_image(url, &data).map(Image::Static)?
+                    }
+                }
+                image::ImageFormat::Jpeg => {
                     Self::load_retained_image(url, &data).map(Image::Static)?
                 }
-            }
-            image::ImageFormat::Jpeg => Self::load_retained_image(url, &data).map(Image::Static)?,
-            image::ImageFormat::Gif => AnimatedImage::load_gif(url, &data).map(Image::Animated)?,
-            fmt => {
-                if guess_svg(&data[..data.len().min(128)]) {
-                    Self::load_svg(url, &data).map(Image::Static)?
-                } else {
-                    anyhow::bail!("unsupported format for '{url}': {fmt:?}")
+                image::ImageFormat::Gif => {
+                    AnimatedImage::load_gif(url, &data).map(Image::Animated)?
                 }
-            }
-        };
+                fmt => anyhow::bail!("unsupported format for '{url}': {fmt:?}"),
+            };
 
-        Ok(img)
+            Ok(img)
+        }
     }
 
     fn load_retained_image(url: &str, data: &[u8]) -> anyhow::Result<egui_extras::RetainedImage> {
@@ -153,7 +156,8 @@ impl ImageFetcher {
 }
 
 fn guess_svg(buffer: &[u8]) -> bool {
-    buffer.starts_with(b"3c3f786d6c")
+    buffer.starts_with(&[0x3c, 0x3f, 0x78, 0x6d, 0x6c])
+        || buffer.starts_with(&[0x3c, 0x73, 0x76, 0x67, 0x20])
 }
 
 pub enum Image {
