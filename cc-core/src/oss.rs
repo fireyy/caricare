@@ -1,6 +1,6 @@
+use crate::util::get_extension;
 use aliyun_oss_client::{errors::OssError, object::ObjectList, Client, Query};
 use md5;
-use std::ffi::OsStr;
 use std::path::PathBuf;
 
 pub enum UploadResult {
@@ -67,7 +67,7 @@ impl OssConfig {
         // let path = PathBuf::from(path);
         let path_clone = path.clone();
         let bucket_path = self.path.clone();
-        let ext = path_clone.extension().and_then(OsStr::to_str).unwrap();
+        let ext = get_extension(path_clone);
         let file_content = std::fs::read(path).unwrap();
         let client = self.client();
         let key = format!("{}/{:x}.{}", bucket_path, md5::compute(&file_content), ext);

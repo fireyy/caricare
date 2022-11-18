@@ -1,6 +1,7 @@
 mod image_cache;
 mod oss;
 pub mod runtime;
+pub mod util;
 pub use aliyun_oss_client::{
     config::GetObjectInfo,
     errors::OssError,
