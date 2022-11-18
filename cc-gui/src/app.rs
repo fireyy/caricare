@@ -3,8 +3,8 @@ use crate::widgets::item_ui;
 use crate::OssFile;
 use bytesize::ByteSize;
 use cc_core::{
-    tokio, tracing, GetObjectInfo, ImageCache, ImageFetcher, ObjectList, OssConfig, OssError,
-    Query, UploadResult,
+    tokio, tracing, util::get_extension, GetObjectInfo, ImageCache, ImageFetcher, ObjectList,
+    OssConfig, OssError, Query, UploadResult,
 };
 use egui_modal::Modal;
 use std::{path::PathBuf, sync::mpsc, vec};
@@ -542,7 +542,9 @@ impl eframe::App for App {
             self.dropped_files = vec![];
             for file in dropped_files {
                 if let Some(path) = &file.path {
-                    files.push(path.clone());
+                    if SUPPORT_EXTENSIONS.contains(&get_extension(path.clone()).as_str()) {
+                        files.push(path.clone());
+                    }
                 }
             }
 
