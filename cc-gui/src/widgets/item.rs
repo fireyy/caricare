@@ -1,6 +1,6 @@
 use crate::theme::text_ellipsis;
 use crate::OssFile;
-use cc_image_cache::ImageCache;
+use cc_core::ImageCache;
 use egui::RichText;
 
 pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &mut ImageCache) -> egui::Response {

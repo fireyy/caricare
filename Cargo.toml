@@ -1,8 +1,7 @@
 [workspace]
 members = [
     "cc-core",
-    "cc-gui",
-    "cc-image-cache"
+    "cc-gui"
 ]
 
 [profile.dev]

@@ -1,5 +1,4 @@
-use cc_core::setup_tracing;
-use cc_image_cache::runtime;
+use cc_core::{runtime, setup_tracing};
 
 mod app;
 mod theme;

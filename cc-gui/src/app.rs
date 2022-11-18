@@ -2,11 +2,11 @@ use crate::theme::text_ellipsis;
 use crate::widgets::item_ui;
 use crate::OssFile;
 use bytesize::ByteSize;
-use cc_core::{tracing, GetObjectInfo, ObjectList, OssConfig, OssError, Query};
-use cc_image_cache::{ImageCache, ImageFetcher};
+use cc_core::{
+    tokio, tracing, GetObjectInfo, ImageCache, ImageFetcher, ObjectList, OssConfig, OssError, Query,
+};
 use egui_modal::{Icon, Modal};
 use std::{sync::mpsc, vec};
-use tokio::runtime;
 
 static THUMB_LIST_WIDTH: f32 = 200.0;
 static THUMB_LIST_HEIGHT: f32 = 50.0;
@@ -36,7 +36,6 @@ enum Route {
 
 pub struct App {
     oss: OssConfig,
-    rt: runtime::Runtime,
     list: Vec<OssFile>,
     current_img: OssFile,
     update_tx: mpsc::SyncSender<Update>,
@@ -58,10 +57,6 @@ impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let oss = OssConfig::new();
         let (update_tx, update_rx) = mpsc::sync_channel(1);
-        let rt = runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
 
         let preview_modal = Modal::new(&cc.egui_ctx, "preview");
 
@@ -73,7 +68,6 @@ impl App {
 
         let mut this = Self {
             oss,
-            rt,
             current_img: OssFile::default(),
             list: vec![],
             update_tx,
@@ -112,10 +106,12 @@ impl App {
             let ctx = ctx.clone();
             let oss = self.oss.clone();
 
-            self.rt.block_on(async move {
-                let res = oss.put(picked_path).await;
-                update_tx.send(Update::Uploaded(res)).unwrap();
-                ctx.request_repaint();
+            cc_core::runtime::spawn(async move {
+                tokio::spawn(async move {
+                    let res = oss.put(picked_path).await;
+                    update_tx.send(Update::Uploaded(res)).unwrap();
+                    ctx.request_repaint();
+                });
             });
         }
     }
@@ -128,10 +124,13 @@ impl App {
             let update_tx = self.update_tx.clone();
             let ctx = ctx.clone();
             let oss = self.oss.clone();
-            self.rt.block_on(async move {
-                let res = oss.get_list(query).await;
-                update_tx.send(Update::List(res)).unwrap();
-                ctx.request_repaint();
+
+            cc_core::runtime::spawn(async move {
+                tokio::spawn(async move {
+                    let res = oss.get_list(query).await;
+                    update_tx.send(Update::List(res)).unwrap();
+                    ctx.request_repaint();
+                });
             });
         }
     }

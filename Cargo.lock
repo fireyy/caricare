@@ -350,9 +350,18 @@ name = "cc-core"
 version = "0.1.0"
 dependencies = [
  "aliyun-oss-client",
+ "anyhow",
+ "egui",
+ "egui_extras",
+ "flume",
+ "image",
  "infer",
  "md5",
+ "once_cell",
+ "reqwest",
  "simple_env_load",
+ "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
 ]
@@ -361,33 +370,14 @@ dependencies = [
 name = "cc-gui"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bytesize",
  "cc-core",
- "cc-image-cache",
  "eframe",
  "egui",
  "egui-modal",
  "egui_extras",
- "flume",
  "image",
  "rfd",
- "tokio",
-]
-
-[[package]]
-name = "cc-image-cache"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "egui",
- "egui_extras",
- "flume",
- "image",
- "once_cell",
- "reqwest",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -2968,19 +2958,7 @@ dependencies = [
  "num_cpus",
  "pin-project-lite",
  "socket2",
- "tokio-macros",
  "winapi",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "1.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9724f9a975fb987ef7a3cd9be0350edcbe130698af5b8f7a631e23d42d052484"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
