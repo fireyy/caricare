@@ -6,7 +6,6 @@ use cc_core::{
     tokio, tracing, util::get_extension, GetObjectInfo, ImageCache, ImageFetcher, ObjectList,
     OssConfig, OssError, Query, UploadResult,
 };
-use egui_modal::Modal;
 use std::{path::PathBuf, sync::mpsc, vec};
 
 static THUMB_LIST_WIDTH: f32 = 200.0;
@@ -47,8 +46,7 @@ pub struct App {
     dropped_files: Vec<egui::DroppedFile>,
     picked_path: Vec<PathBuf>,
     show_type: ShowType,
-    preview_modal: Modal,
-    dialog: Modal,
+    is_preview: bool,
     loading_more: bool,
     next_query: Option<Query>,
     scroll_top: bool,
@@ -61,10 +59,6 @@ impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let oss = OssConfig::new();
         let (update_tx, update_rx) = mpsc::sync_channel(1);
-
-        let preview_modal = Modal::new(&cc.egui_ctx, "preview");
-
-        let dialog = Modal::new(&cc.egui_ctx, "my_dialog");
 
         let query = Self::build_query(oss.path.clone());
 
@@ -81,8 +75,7 @@ impl App {
             dropped_files: vec![],
             picked_path: vec![],
             show_type: ShowType::List,
-            preview_modal,
-            dialog,
+            is_preview: false,
             loading_more: false,
             next_query: Some(query),
             scroll_top: false,
@@ -250,7 +243,7 @@ impl App {
                             .clicked()
                         {
                             self.current_img = data.clone();
-                            self.preview_modal.open();
+                            self.is_preview = true;
                             ui.ctx().request_repaint();
                         }
                     });
@@ -280,7 +273,7 @@ impl App {
                             let resp = item_ui(ui, d.clone(), &mut self.images);
                             if resp.on_hover_text(url).clicked() {
                                 self.current_img = d.clone();
-                                self.preview_modal.open();
+                                self.is_preview = true;
                                 ui.ctx().request_repaint();
                             }
                         }
@@ -369,18 +362,13 @@ impl App {
                 .clicked()
             {
                 self.is_show_result = !self.is_show_result;
-                // self.dialog.open_dialog(
-                //     Some("Info"),       // title
-                //     Some("Working..."), // body
-                //     Some(Icon::Info),   // icon
-                // )
             }
         });
     }
 
     fn show_image(&mut self, ctx: &egui::Context) {
         let Self {
-            preview_modal: show_modal,
+            mut is_preview,
             current_img,
             ..
         } = self;
@@ -389,44 +377,59 @@ impl App {
             return;
         }
 
-        show_modal.show(|ui| {
-            show_modal.title(ui, "Preview");
-            show_modal.frame(ui, |ui| {
-                ui.vertical(|ui| {
-                    let url = format!("{}/{}", self.oss.url, current_img.key);
-
-                    if ui
-                        .add(
-                            egui::Label::new(
-                                egui::RichText::new(format!("url: {}{}", url.clone(), "\u{1f4cb}"))
-                                    .monospace(),
-                            )
-                            .sense(egui::Sense::click()),
-                        )
-                        .on_hover_text("Click to copy")
-                        .clicked()
-                    {
-                        ui.output().copied_text = url;
+        if is_preview {
+            egui::Area::new("preview_area")
+                // .order(egui::Order::Foreground)
+                // .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .fixed_pos(egui::Pos2::ZERO)
+                .show(ctx, |ui| {
+                    let screen_rect = ui.ctx().input().screen_rect;
+                    let area_response =
+                        ui.allocate_response(screen_rect.size(), egui::Sense::click());
+                    if area_response.clicked() {
+                        self.is_preview = false;
                     }
-                    ui.monospace(format!("size: {}", current_img.size));
-                    ui.monospace(format!("last modified: {}", current_img.last_modified));
+                    ui.painter().rect_filled(
+                        screen_rect,
+                        egui::Rounding::none(),
+                        egui::Color32::from_rgba_premultiplied(0, 0, 0, 200),
+                    );
+                    let win_size = screen_rect.size();
+                    let response = egui::Window::new("")
+                        .id(egui::Id::new("preview_win"))
+                        .open(&mut is_preview)
+                        .title_bar(false)
+                        .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
+                        .resizable(false)
+                        .show(&ctx, |ui| {
+                            egui::ScrollArea::vertical()
+                                .auto_shrink([false; 2])
+                                .max_height(win_size.y - 100.0)
+                                .show(ui, |ui| {
+                                    if let Some(img) = self.images.get(&current_img.url) {
+                                        let mut size = img.size_vec2();
+                                        size *= (ui.available_width() / size.x).min(1.0);
+                                        img.show_size(ui, size);
+                                    }
+                                });
+                            ui.vertical_centered_justified(|ui| {
+                                let mut url = format!("{}/{}", self.oss.url, current_img.key);
+                                let resp = ui.add(egui::TextEdit::singleline(&mut url));
+                                if resp.on_hover_text("Click to copy").clicked() {
+                                    ui.output().copied_text = url;
+                                }
+                                ui.horizontal(|ui| {
+                                    ui.label(format!("size: {}", current_img.size));
+                                    ui.label(&current_img.last_modified);
+                                });
+                            });
+                        });
+                    if let Some(inner_response) = response {
+                        inner_response.response.request_focus();
+                        ctx.move_to_top(inner_response.response.layer_id);
+                    }
                 });
-                let win_size = ctx.input().screen_rect().size();
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false; 2])
-                    .max_height(win_size.y - 200.0)
-                    .show(ui, |ui| {
-                        if let Some(img) = self.images.get(&current_img.url) {
-                            let mut size = img.size_vec2();
-                            size *= (ui.available_width() / size.x).min(1.0);
-                            img.show_size(ui, size);
-                        }
-                    });
-            });
-            show_modal.buttons(ui, |ui| {
-                show_modal.suggested_button(ui, "Ok");
-            });
-        });
+        }
     }
     fn show_result(&mut self, ctx: &egui::Context) {
         if self.is_show_result {
@@ -533,7 +536,6 @@ impl eframe::App for App {
         });
 
         self.show_image(ctx);
-        self.dialog.show_dialog();
         self.show_result(ctx);
 
         if !self.dropped_files.is_empty() {
