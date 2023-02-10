@@ -345,6 +345,18 @@ impl App {
             ui.label("No More Data.");
         }
 
+        match &mut self.state {
+            State::Idle(_) => (),
+            State::Busy(route) => match route {
+                Route::Upload => {
+                    ui.label("Uploading file...");
+                }
+                Route::List => {
+                    ui.label("Getting file list...");
+                }
+            },
+        }
+
         if let Some(err) = &self.err {
             ui.label(egui::RichText::new(err).color(egui::Color32::RED));
         }
@@ -519,16 +531,9 @@ impl eframe::App for App {
                             Route::Upload => {}
                             Route::List => self.render_content(ui),
                         },
-                        State::Busy(route) => {
-                            ui.centered_and_justified(|ui| match route {
-                                Route::Upload => {
-                                    ui.spinner();
-                                    ui.heading("Uploading file...");
-                                }
-                                Route::List => {
-                                    ui.spinner();
-                                    ui.heading("Getting file list...");
-                                }
+                        State::Busy(_) => {
+                            ui.centered_and_justified(|ui| {
+                                ui.spinner();
                             });
                         }
                     };
