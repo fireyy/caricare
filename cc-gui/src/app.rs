@@ -141,7 +141,7 @@ impl App {
         for data in obj.object_list {
             let (base, last_modified, _etag, _typ, size, _storage_class) = data.pieces();
             let key = base.path().to_string();
-            let url = self.oss.get_file_url(key.clone());
+            let url = self.oss.get_file_url(&key);
             let name = key.replace(self.oss.get_path(), "").replace("/", "");
 
             list.push(OssFile {
@@ -425,7 +425,7 @@ impl App {
                                     }
                                 });
                             ui.vertical_centered_justified(|ui| {
-                                let mut url = format!("{}/{}", self.oss.get_url(), current_img.key);
+                                let mut url = self.oss.get_file_url(&current_img.key);
                                 let resp = ui.add(egui::TextEdit::singleline(&mut url));
                                 if resp.on_hover_text("Click to copy").clicked() {
                                     ui.output().copied_text = url;

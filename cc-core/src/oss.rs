@@ -32,20 +32,25 @@ impl OssClient {
     //     endpoint
     // }
 
-    pub fn get_file_url(&self, path: String) -> String {
-        self.client
-            .get_endpoint_url()
-            .join(&path)
-            .unwrap()
-            .to_string()
+    pub fn get_file_url(&self, path: &String) -> String {
+        format!("{}{path}", self.get_url())
+        // self.client
+        //     .get_endpoint_url()
+        //     .join(&path)
+        //     .unwrap()
+        //     .to_string()
     }
 
     pub fn get_path(&self) -> &String {
         &self.path
     }
 
-    pub fn get_url(&self) -> &String {
-        &self.url
+    pub fn get_url(&self) -> String {
+        if self.url.is_empty() {
+            self.client.get_bucket_url().to_string()
+        } else {
+            self.url.clone()
+        }
     }
 
     pub fn client(&self) -> &Client {
