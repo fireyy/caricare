@@ -3,8 +3,8 @@ use crate::widgets::item_ui;
 use crate::OssFile;
 use bytesize::ByteSize;
 use cc_core::{
-    tokio, tracing, util::get_extension, GetObjectInfo, ImageCache, ImageFetcher, ObjectList,
-    OssConfig, OssError, Query, UploadResult,
+    tokio, tracing, util::get_extension, ImageCache, ImageFetcher, ObjectList, OssClient, OssError,
+    Query, UploadResult,
 };
 use std::{path::PathBuf, sync::mpsc, vec};
 
@@ -36,7 +36,7 @@ enum Route {
 }
 
 pub struct App {
-    oss: OssConfig,
+    oss: OssClient,
     list: Vec<OssFile>,
     current_img: OssFile,
     update_tx: mpsc::SyncSender<Update>,
@@ -57,10 +57,10 @@ pub struct App {
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let oss = OssConfig::new();
+        let oss = OssClient::new().expect("env variable not found");
         let (update_tx, update_rx) = mpsc::sync_channel(1);
 
-        let query = Self::build_query(oss.path.clone());
+        let query = Self::build_query(oss.get_path());
 
         let images = ImageCache::new(ImageFetcher::spawn(cc.egui_ctx.clone()));
 
@@ -89,9 +89,9 @@ impl App {
         this
     }
 
-    fn build_query(path: String) -> Query {
+    fn build_query(path: &String) -> Query {
         let mut query = Query::new();
-        query.insert("prefix", path);
+        query.insert("prefix", path.clone());
         query.insert("max-keys", "40");
         query
     }
@@ -142,7 +142,7 @@ impl App {
             let (base, last_modified, _etag, _typ, size, _storage_class) = data.pieces();
             let key = base.path().to_string();
             let url = self.oss.get_file_url(key.clone());
-            let name = key.replace(&self.oss.path, "").replace("/", "");
+            let name = key.replace(self.oss.get_path(), "").replace("/", "");
 
             list.push(OssFile {
                 name,
@@ -301,7 +301,7 @@ impl App {
             ui.add_enabled_ui(enabled, |ui| {
                 if ui.button("\u{1f503}").clicked() {
                     self.scroll_top = true;
-                    let query = Self::build_query(self.oss.path.clone());
+                    let query = Self::build_query(self.oss.get_path());
                     self.next_query = Some(query);
                     self.list = vec![];
                     self.get_list(ui.ctx());
@@ -425,7 +425,7 @@ impl App {
                                     }
                                 });
                             ui.vertical_centered_justified(|ui| {
-                                let mut url = format!("{}/{}", self.oss.url, current_img.key);
+                                let mut url = format!("{}/{}", self.oss.get_url(), current_img.key);
                                 let resp = ui.add(egui::TextEdit::singleline(&mut url));
                                 if resp.on_hover_text("Click to copy").clicked() {
                                     ui.output().copied_text = url;

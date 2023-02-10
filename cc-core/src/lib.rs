@@ -3,13 +3,12 @@ mod oss;
 pub mod runtime;
 pub mod util;
 pub use aliyun_oss_client::{
-    config::GetObjectInfo,
     errors::OssError,
     object::{Object, ObjectList},
     Query,
 };
 pub use image_cache::{ImageCache, ImageFetcher};
-pub use oss::{OssConfig, UploadResult};
+pub use oss::{OssClient, UploadResult};
 pub use tokio;
 pub use tracing;
 
