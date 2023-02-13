@@ -1,9 +1,9 @@
 use crate::theme::text_ellipsis;
-use crate::OssFile;
+use crate::OssObject;
 use cc_core::ImageCache;
 use egui::RichText;
 
-pub fn item_ui(ui: &mut egui::Ui, data: OssFile, images: &mut ImageCache) -> egui::Response {
+pub fn item_ui(ui: &mut egui::Ui, data: OssObject, images: &mut ImageCache) -> egui::Response {
     let response = egui::Frame {
         inner_margin: egui::style::Margin::same(5.0),
         outer_margin: egui::style::Margin::same(0.0),

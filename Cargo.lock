@@ -60,16 +60,14 @@ dependencies = [
 [[package]]
 name = "aliyun-oss-client"
 version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0dcecc087d3487e478ad7499553f129e253c74f272fd2c51c1d87774d2b0846"
+source = "git+https://github.com/tu6ge/oss-rs.git?rev=977db3f#977db3f7ea0638154bf0f556722cdf44bc33ab5a"
 dependencies = [
  "async-stream",
  "async-trait",
- "base64",
+ "base64 0.20.0",
  "chrono",
  "futures",
  "futures-core",
- "futures-util",
  "hmac",
  "http",
  "infer",
@@ -275,6 +273,12 @@ name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
+
+[[package]]
+name = "base64"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "bitflags"
@@ -2295,8 +2299,7 @@ dependencies = [
 [[package]]
 name = "oss_derive"
 version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93141ed20f015618f84a025f5929445c977cb3d73685e5e995276e82ec0dd455"
+source = "git+https://github.com/tu6ge/oss-rs.git?rev=977db3f#977db3f7ea0638154bf0f556722cdf44bc33ab5a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2585,7 +2588,7 @@ version = "0.11.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "431949c384f4e2ae07605ccaa56d1d9d2ecdb5cadd4f9577ccfab29f2e5149fc"
 dependencies = [
- "base64",
+ "base64 0.13.1",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -2673,7 +2676,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "300a51053b1cb55c80b7a9fde4120726ddf25ca241a1cbb926626f62fb136bff"
 dependencies = [
- "base64",
+ "base64 0.13.1",
  "bitflags",
  "serde",
 ]
@@ -3439,7 +3442,7 @@ version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28a82565b5c96dcbb58c9bdbb6aa3642abd395a6a6b480658532c6f74c3c4b7a"
 dependencies = [
- "base64",
+ "base64 0.13.1",
  "data-url",
  "flate2",
  "float-cmp",

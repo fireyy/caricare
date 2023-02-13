@@ -5,9 +5,17 @@ mod theme;
 mod widgets;
 
 #[derive(Clone, Default)]
-pub struct OssFile {
+pub enum OssObjectType {
+    #[default]
+    File,
+    Folder,
+}
+
+#[derive(Clone, Default)]
+pub struct OssObject {
+    pub obj_type: OssObjectType,
     pub name: String,
-    pub key: String,
+    pub path: String,
     pub url: String,
     pub size: String,
     pub last_modified: String,

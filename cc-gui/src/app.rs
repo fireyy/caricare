@@ -1,6 +1,6 @@
 use crate::theme::text_ellipsis;
 use crate::widgets::item_ui;
-use crate::OssFile;
+use crate::{OssObject, OssObjectType};
 use bytesize::ByteSize;
 use cc_core::{
     tokio, tracing, util::get_extension, ImageCache, ImageFetcher, ObjectList, OssClient, OssError,
@@ -37,8 +37,8 @@ enum Route {
 
 pub struct App {
     oss: OssClient,
-    list: Vec<OssFile>,
-    current_img: OssFile,
+    list: Vec<OssObject>,
+    current_img: OssObject,
     update_tx: mpsc::SyncSender<Update>,
     update_rx: mpsc::Receiver<Update>,
     state: State,
@@ -53,6 +53,7 @@ pub struct App {
     images: ImageCache,
     upload_result: Vec<UploadResult>,
     is_show_result: bool,
+    current_path: String,
 }
 
 impl App {
@@ -60,13 +61,13 @@ impl App {
         let oss = OssClient::new().expect("env variable not found");
         let (update_tx, update_rx) = mpsc::sync_channel(1);
 
-        let query = Self::build_query(oss.get_path());
+        let current_path = oss.get_path().to_string();
 
         let images = ImageCache::new(ImageFetcher::spawn(cc.egui_ctx.clone()));
 
         let mut this = Self {
             oss,
-            current_img: OssFile::default(),
+            current_img: OssObject::default(),
             list: vec![],
             update_tx,
             update_rx,
@@ -77,21 +78,25 @@ impl App {
             show_type: ShowType::List,
             is_preview: false,
             loading_more: false,
-            next_query: Some(query),
+            next_query: None,
             scroll_top: false,
             images,
             upload_result: vec![],
             is_show_result: false,
+            current_path,
         };
 
         this.get_list(&cc.egui_ctx);
+        this.next_query = Some(this.build_query());
 
         this
     }
 
-    fn build_query(path: &String) -> Query {
+    fn build_query(&self) -> Query {
         let mut query = Query::new();
-        query.insert("prefix", path.clone());
+        query.insert("prefix", self.current_path.clone());
+        // query.insert("prefix", "");
+        query.insert("delimiter", "/");
         query.insert("max-keys", "40");
         query
     }
@@ -118,6 +123,7 @@ impl App {
     }
 
     fn get_list(&mut self, ctx: &egui::Context) {
+        // TODO: use `ObjectList::get_next_list`
         if let Some(query) = &self.next_query {
             if !self.loading_more {
                 self.state = State::Busy(Route::List);
@@ -139,22 +145,57 @@ impl App {
     }
 
     fn set_list(&mut self, obj: ObjectList) {
-        let mut list = vec![];
-        for data in obj.object_list {
-            let (base, last_modified, _etag, _typ, size, _storage_class) = data.pieces();
-            let key = base.path().to_string();
-            let url = self.oss.get_file_url(&key);
-            let name = key.replace(self.oss.get_path(), "").replace("/", "");
+        // let mut list = vec![];
+        let mut dirs: Vec<OssObject> = obj
+            .common_prefixes()
+            .iter()
+            .map(|x| x.to_str())
+            .filter(|x| x.ne(&"/"))
+            .map(|x| {
+                let name = get_name_form_path(x);
+                OssObject {
+                    obj_type: OssObjectType::Folder,
+                    name,
+                    path: x.to_string(),
+                    ..Default::default()
+                }
+            })
+            .collect();
 
-            list.push(OssFile {
-                name,
-                key,
-                url,
-                size: format!("{}", ByteSize(size)),
-                last_modified: last_modified.format("%Y-%m-%d %H:%M:%S").to_string(),
-            });
-        }
-        self.list.append(&mut list);
+        let mut files: Vec<OssObject> = obj
+            .object_list
+            .iter()
+            .map(|data| {
+                let path = data.path_string();
+                let url = self.oss.get_file_url(&path);
+                let name = get_name_form_path(&path);
+
+                OssObject {
+                    obj_type: OssObjectType::File,
+                    name,
+                    path,
+                    url,
+                    size: format!("{}", ByteSize(data.size())),
+                    last_modified: data.last_modified().format("%Y-%m-%d %H:%M:%S").to_string(),
+                }
+            })
+            .collect();
+        // for data in obj.object_list {
+        //     let (base, last_modified, _etag, _typ, size, _storage_class) = data.pieces();
+        //     let key = base.path().to_string();
+        //     let url = self.oss.get_file_url(&key);
+        //     let name = key.replace(&self.current_path, "").replace("/", "");
+
+        //     list.push(OssFile {
+        //         name,
+        //         key,
+        //         url,
+        //         size: format!("{}", ByteSize(size)),
+        //         last_modified: last_modified.format("%Y-%m-%d %H:%M:%S").to_string(),
+        //     });
+        // }
+        self.list.append(&mut dirs);
+        self.list.append(&mut files);
     }
 
     fn load_more(&mut self, ctx: &egui::Context) {
@@ -286,13 +327,20 @@ impl App {
     }
 
     fn bar_contents(&mut self, ui: &mut egui::Ui) {
-        if ui.button("Upload file...").clicked() {
+        if ui
+            .button("\u{2b06}")
+            .on_hover_text("Upload file...")
+            .clicked()
+        {
             if let Some(paths) = rfd::FileDialog::new()
                 .add_filter("image", &SUPPORT_EXTENSIONS)
                 .pick_files()
             {
                 self.picked_path = paths;
             }
+        }
+        if ui.button("\u{2b05}").on_hover_text("Back").clicked() {
+            //
         }
         ui.horizontal(|ui| {
             ui.set_width(25.0);
@@ -303,7 +351,7 @@ impl App {
             ui.add_enabled_ui(enabled, |ui| {
                 if ui.button("\u{1f503}").clicked() {
                     self.scroll_top = true;
-                    let query = Self::build_query(self.oss.get_path());
+                    let query = self.build_query();
                     self.next_query = Some(query);
                     self.list = vec![];
                     self.get_list(ui.ctx());
@@ -431,7 +479,7 @@ impl App {
                                     }
                                 });
                             ui.vertical_centered_justified(|ui| {
-                                let mut url = self.oss.get_file_url(&current_img.key);
+                                let mut url = self.oss.get_file_url(&current_img.path);
                                 let resp = ui.add(egui::TextEdit::singleline(&mut url));
                                 if resp.on_hover_text("Click to copy").clicked() {
                                     ui.output().copied_text = url;
@@ -570,4 +618,12 @@ impl eframe::App for App {
             self.dropped_files = ctx.input().raw.dropped_files.clone();
         }
     }
+}
+
+fn get_name_form_path(path: &str) -> String {
+    path.split('/')
+        .filter(|k| !k.is_empty())
+        .last()
+        .unwrap_or("")
+        .to_string()
 }

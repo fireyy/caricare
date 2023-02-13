@@ -1,5 +1,10 @@
 use crate::util::get_extension;
-use aliyun_oss_client::{errors::OssError, file::File, object::ObjectList, Client, Query};
+use aliyun_oss_client::{
+    errors::OssError,
+    file::{FileAs, FileError},
+    object::ObjectList,
+    Client, Query,
+};
 use md5;
 use std::path::PathBuf;
 
@@ -61,7 +66,7 @@ impl OssClient {
         self.client.get_bucket_base().name().to_string()
     }
 
-    pub async fn put(&self, path: PathBuf) -> Result<String, OssError> {
+    pub async fn put(&self, path: PathBuf) -> Result<String, FileError> {
         // let path = PathBuf::from(path);
         let path_clone = path.clone();
         let bucket_path = self.path.clone();
@@ -74,7 +79,7 @@ impl OssClient {
         };
         let result = self
             .client
-            .put_content(file_content, key, get_content_type)
+            .put_content_as(file_content, key, get_content_type)
             .await;
         result
     }
@@ -84,7 +89,7 @@ impl OssClient {
         for path in paths {
             match self.put(path).await {
                 Ok(str) => results.push(UploadResult::Success(str)),
-                Err(err) => results.push(UploadResult::Error(err.message())),
+                Err(err) => results.push(UploadResult::Error(err.to_string())),
             }
         }
 
@@ -93,7 +98,7 @@ impl OssClient {
 
     pub async fn get_list(self, query: Query) -> Result<ObjectList, OssError> {
         let result = self.client.get_object_list(query).await;
-        tracing::info!("{:?}", result);
+        tracing::info!("Result: {:?}", result);
         result
     }
 }
