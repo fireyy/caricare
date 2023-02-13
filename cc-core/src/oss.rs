@@ -57,6 +57,10 @@ impl OssClient {
         &self.client
     }
 
+    pub fn get_bucket_name(&self) -> String {
+        self.client.get_bucket_base().name().to_string()
+    }
+
     pub async fn put(&self, path: PathBuf) -> Result<String, OssError> {
         // let path = PathBuf::from(path);
         let path_clone = path.clone();
@@ -69,7 +73,7 @@ impl OssClient {
             None => None,
         };
         let result = self
-            .client()
+            .client
             .put_content(file_content, key, get_content_type)
             .await;
         result
@@ -87,9 +91,8 @@ impl OssClient {
         Ok(results)
     }
 
-    pub async fn get_list(&self, query: Query) -> Result<ObjectList, OssError> {
-        // FIXME: client clone
-        let result = self.client().clone().get_object_list(query).await;
+    pub async fn get_list(self, query: Query) -> Result<ObjectList, OssError> {
+        let result = self.client.get_object_list(query).await;
         tracing::info!("{:?}", result);
         result
     }

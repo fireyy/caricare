@@ -118,12 +118,14 @@ impl App {
     }
 
     fn get_list(&mut self, ctx: &egui::Context) {
-        if let Some(query) = self.next_query.clone() {
+        if let Some(query) = &self.next_query {
             if !self.loading_more {
                 self.state = State::Busy(Route::List);
             }
+
             let update_tx = self.update_tx.clone();
             let ctx = ctx.clone();
+            let query = query.clone();
             let oss = self.oss.clone();
 
             cc_core::runtime::spawn(async move {
@@ -308,7 +310,11 @@ impl App {
                 }
             });
         });
-        ui.label(format!("List({})", self.list.len()));
+        ui.label(format!(
+            "{}({})",
+            self.oss.get_bucket_name(),
+            self.list.len()
+        ));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
             ui.style_mut().spacing.item_spacing.x = 0.0;
             egui::Frame {
