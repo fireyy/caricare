@@ -3,8 +3,8 @@ use crate::widgets::item_ui;
 use crate::{OssObject, OssObjectType};
 use bytesize::ByteSize;
 use cc_core::{
-    tokio, tracing, util::get_extension, History, ImageCache, ImageFetcher, ObjectList, OssClient,
-    OssError, Query, UploadResult,
+    tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, ObjectList,
+    OssClient, OssError, Query, UploadResult,
 };
 use std::{path::PathBuf, sync::mpsc, vec};
 
@@ -61,7 +61,7 @@ pub struct App {
     upload_result: Vec<UploadResult>,
     is_show_result: bool,
     // current_path: String,
-    navigator: History<String>,
+    navigator: MemoryHistory,
 }
 
 impl App {
@@ -70,7 +70,7 @@ impl App {
         let (update_tx, update_rx) = mpsc::sync_channel(1);
 
         let current_path = oss.get_path().to_string();
-        let navigator = History::new();
+        let navigator = MemoryHistory::new();
 
         let images = ImageCache::new(ImageFetcher::spawn(cc.egui_ctx.clone()));
 
@@ -87,12 +87,11 @@ impl App {
             show_type: ShowType::List,
             is_preview: false,
             loading_more: false,
-            next_query: Some(build_query(&current_path)),
+            next_query: Some(build_query(current_path.clone())),
             scroll_top: false,
             images,
             upload_result: vec![],
             is_show_result: false,
-            // current_path,
             navigator,
         };
 
@@ -146,7 +145,6 @@ impl App {
     }
 
     fn set_list(&mut self, obj: ObjectList) {
-        // let mut list = vec![];
         let mut dirs: Vec<OssObject> = obj
             .common_prefixes()
             .iter()
@@ -181,20 +179,7 @@ impl App {
                 }
             })
             .collect();
-        // for data in obj.object_list {
-        //     let (base, last_modified, _etag, _typ, size, _storage_class) = data.pieces();
-        //     let key = base.path().to_string();
-        //     let url = self.oss.get_file_url(&key);
-        //     let name = key.replace(&self.current_path, "").replace("/", "");
 
-        //     list.push(OssFile {
-        //         name,
-        //         key,
-        //         url,
-        //         size: format!("{}", ByteSize(size)),
-        //         last_modified: last_modified.format("%Y-%m-%d %H:%M:%S").to_string(),
-        //     });
-        // }
         self.list.append(&mut dirs);
         self.list.append(&mut files);
     }
@@ -210,7 +195,7 @@ impl App {
 
     fn refresh(&mut self, ctx: &egui::Context) {
         self.scroll_top = true;
-        let current_path = self.navigator.get_current();
+        let current_path = self.navigator.location();
         self.next_query = Some(build_query(current_path));
         self.list = vec![];
         self.get_list(ctx);
@@ -355,18 +340,16 @@ impl App {
     }
 
     fn bar_contents(&mut self, ui: &mut egui::Ui) {
-        ui.add_enabled_ui(self.navigator.can_go_backward(), |ui| {
+        ui.add_enabled_ui(self.navigator.can_go_back(), |ui| {
             if ui.button("\u{2b05}").on_hover_text("Back").clicked() {
                 self.update_tx
                     .send(Update::Navgator(NavgatorType::Back))
                     .unwrap();
             }
         });
-        ui.add_enabled_ui(!self.navigator.get_current().is_empty(), |ui| {
+        ui.add_enabled_ui(!self.navigator.location().is_empty(), |ui| {
             if ui.button("\u{2b06}").on_hover_text("Go Parent").clicked() {
-                // self.update_tx
-                //     .send(Update::Navgator(NavgatorType::Back))
-                //     .unwrap();
+                //
             }
         });
         ui.add_enabled_ui(self.navigator.can_go_forward(), |ui| {
@@ -401,7 +384,6 @@ impl App {
                 }
             });
         });
-        // ui.label(self.oss.get_bucket_name());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
             ui.style_mut().spacing.item_spacing.x = 0.0;
             egui::Frame {
@@ -604,13 +586,13 @@ impl eframe::App for App {
                 Update::Navgator(nav) => {
                     match nav {
                         NavgatorType::Back => {
-                            if self.navigator.can_go_backward() {
-                                self.navigator.go_backward();
+                            if self.navigator.can_go_back() {
+                                self.navigator.go(-1);
                             }
                         }
                         NavgatorType::Forward => {
                             if self.navigator.can_go_forward() {
-                                self.navigator.go_forward();
+                                self.navigator.go(1);
                             }
                         }
                         NavgatorType::New(path) => {
@@ -691,14 +673,13 @@ fn get_name_form_path(path: &str) -> String {
         .to_string()
 }
 
-fn build_query(path: &String) -> Query {
+fn build_query(path: String) -> Query {
     let mut path = path.clone();
     if !path.ends_with('/') && !path.is_empty() {
         path.push_str("/");
     }
     let mut query = Query::new();
     query.insert("prefix", path);
-    // query.insert("prefix", "");
     query.insert("delimiter", "/");
     query.insert("max-keys", "40");
     query

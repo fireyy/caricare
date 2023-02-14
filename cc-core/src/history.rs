@@ -1,125 +1,151 @@
-use std::ops::{Index, IndexMut};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::collections::VecDeque;
+use std::fmt;
+use std::rc::Rc;
 
-/// History is a vector with support for go forward and go back
-pub struct History<T> {
-    vec: Vec<T>,
-    pub index: usize,
+/// A History Stack.
+#[derive(Debug, Default)]
+struct LocationStack {
+    prev: Vec<String>,
+    next: VecDeque<String>,
+    current: String,
 }
 
-impl<T> History<T> {
-    /// Creates a new history
-    pub const fn new() -> History<T> {
-        History {
-            vec: Vec::new(),
-            index: 0usize,
+impl LocationStack {
+    fn current(&self) -> String {
+        self.current.clone()
+    }
+
+    fn len(&self) -> usize {
+        self.prev.len() + self.next.len() + 1
+    }
+
+    fn prev_len(&self) -> usize {
+        self.prev.len()
+    }
+
+    fn next_len(&self) -> usize {
+        self.next.len()
+    }
+
+    fn go(&mut self, delta: isize) {
+        match delta.cmp(&0) {
+            // Go forward.
+            Ordering::Greater => {
+                for _i in 0..delta {
+                    if let Some(mut m) = self.next.pop_front() {
+                        std::mem::swap(&mut m, &mut self.current);
+
+                        self.prev.push(m);
+                    }
+                }
+            }
+            // Go backward.
+            Ordering::Less => {
+                for _i in 0..-delta {
+                    if let Some(mut m) = self.prev.pop() {
+                        std::mem::swap(&mut m, &mut self.current);
+
+                        self.next.push_front(m);
+                    }
+                }
+            }
+            // Do nothing.
+            Ordering::Equal => {}
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    fn push(&mut self, mut location: String) {
+        std::mem::swap(&mut location, &mut self.current);
+
+        self.prev.push(location);
+        // When a history is pushed, we clear all forward states.
+        self.next.clear();
     }
 
-    /// Returns whether you can go backwards
-    #[inline]
-    pub const fn can_go_backward(&self) -> bool {
-        self.index > 1usize
+    fn replace(&mut self, location: String) {
+        self.current = location;
+    }
+}
+
+/// A [`History`] that is implemented with in memory history stack and is usable in most targets.
+///
+/// # Panics
+///
+/// MemoryHistory does not support relative paths and will panic if routes are not starting with `/`.
+#[derive(Clone, Default)]
+pub struct MemoryHistory {
+    inner: Rc<RefCell<LocationStack>>,
+}
+
+impl PartialEq for MemoryHistory {
+    fn eq(&self, rhs: &Self) -> bool {
+        Rc::ptr_eq(&self.inner, &rhs.inner)
+    }
+}
+
+impl fmt::Debug for MemoryHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MemoryHistory").finish()
+    }
+}
+
+impl MemoryHistory {
+    /// Creates a new [`MemoryHistory`] with a default entry of '/'.
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Returns whether you can go forwards
-    #[inline]
-    pub fn can_go_forward(&self) -> bool {
-        0usize < self.vec.len() && self.index < self.len()
-    }
+    /// Creates a new [`MemoryHistory`] with entires.
+    pub fn with_entries<'a>(entries: impl IntoIterator<Item = impl Into<Cow<'a, str>>>) -> Self {
+        let self_ = Self::new();
 
-    /// Go forward
-    pub fn go_forward(&mut self) {
-        self.go_multi_forward(1);
-    }
-
-    /// Go `count` times forward
-    #[inline]
-    pub fn go_multi_forward(&mut self, count: usize) {
-        self.index += count;
-    }
-
-    /// Go backwards
-    pub fn go_backward(&mut self) {
-        self.go_multi_backward(1);
-    }
-
-    /// Go `count` times backwards
-    #[inline]
-    pub fn go_multi_backward(&mut self, count: usize) {
-        self.index -= count;
-    }
-
-    /// Pushes a new element to history
-    pub fn push(&mut self, element: T) {
-        let vec_i = self.vec.len();
-        if self.index != vec_i {
-            let diff: usize = vec_i - self.index;
-            for _ in 0..diff {
-                self.pop();
+        for (index, entry) in entries.into_iter().enumerate() {
+            if index == 0 {
+                self_.replace(entry);
+            } else {
+                self_.push(entry);
             }
         }
-        self.vec.push(element);
-        self.index += 1;
+
+        self_
     }
 
-    /// Removes the last element from a vector and returns it, or `None` if it is empty
-    pub fn pop(&mut self) -> Option<T> {
-        self.index -= 1;
-        self.vec.pop()
-    }
-
-    /// Returns the current element
-    pub fn get_current(&self) -> &T {
-        &self.vec[self.index - 1]
-    }
-
-    /// Returns the length of the history
     pub fn len(&self) -> usize {
-        self.vec.len()
-    }
-}
-
-impl<T> Index<usize> for History<T> {
-    type Output = T;
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.vec[index]
-    }
-}
-
-impl<T> IndexMut<usize> for History<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.vec[index]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_history_order() {
-        let mut history: History<&str> = History::new();
-        history.push("Element 1");
-        history.push("Element 2");
-        history.push("Element 3");
-        history.go_backward();
-        assert_eq!(*history.get_current(), "Element 2");
+        self.inner.borrow().len()
     }
 
-    #[test]
-    fn test_multi_back_for_switch() {
-        let mut history: History<usize> = History::new();
-        history.push(3);
-        history.push(6);
-        history.push(7);
-        history.go_backward();
-        history.push(1);
-        history.push(9);
-        history.go_backward();
-        assert_eq!(*history.get_current(), 3usize);
+    pub fn can_go_back(&self) -> bool {
+        self.inner.borrow().prev_len() > 1
+    }
+
+    pub fn can_go_forward(&self) -> bool {
+        self.inner.borrow().next_len() > 0
+    }
+
+    pub fn go(&self, delta: isize) {
+        self.inner.borrow_mut().go(delta)
+    }
+
+    pub fn push<'a>(&self, route: impl Into<Cow<'a, str>>) {
+        let route = route.into();
+
+        let location = route.to_string().into();
+
+        self.inner.borrow_mut().push(location);
+    }
+
+    pub fn replace<'a>(&self, route: impl Into<Cow<'a, str>>) {
+        let route = route.into();
+
+        let location = route.to_string().into();
+
+        self.inner.borrow_mut().replace(location);
+    }
+
+    pub fn location(&self) -> String {
+        self.inner.borrow().current()
     }
 }

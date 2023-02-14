@@ -8,7 +8,7 @@ pub use aliyun_oss_client::{
     object::{Object, ObjectList},
     Query,
 };
-pub use history::History;
+pub use history::MemoryHistory;
 pub use image_cache::{ImageCache, ImageFetcher};
 pub use oss::{OssClient, UploadResult};
 pub use tokio;
