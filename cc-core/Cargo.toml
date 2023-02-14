@@ -7,7 +7,8 @@ edition = "2021"
 
 [dependencies]
 # aliyun-oss-client = "0.10.1"
-aliyun-oss-client = { git = "https://github.com/tu6ge/oss-rs.git", rev = "977db3f" }
+# aliyun-oss-client = { git = "https://github.com/tu6ge/oss-rs.git", rev = "977db3f" }
+aliyun-oss-client = { path = "../../oss-rs" }
 simple_env_load = "0.2"
 tracing = "0.1.29"
 tracing-subscriber = "0.3.0"

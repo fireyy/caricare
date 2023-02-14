@@ -1,3 +1,4 @@
+mod history;
 mod image_cache;
 mod oss;
 pub mod runtime;
@@ -7,6 +8,7 @@ pub use aliyun_oss_client::{
     object::{Object, ObjectList},
     Query,
 };
+pub use history::History;
 pub use image_cache::{ImageCache, ImageFetcher};
 pub use oss::{OssClient, UploadResult};
 pub use tokio;

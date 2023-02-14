@@ -60,7 +60,6 @@ dependencies = [
 [[package]]
 name = "aliyun-oss-client"
 version = "0.10.1"
-source = "git+https://github.com/tu6ge/oss-rs.git?rev=977db3f#977db3f7ea0638154bf0f556722cdf44bc33ab5a"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2299,7 +2298,6 @@ dependencies = [
 [[package]]
 name = "oss_derive"
 version = "0.9.6"
-source = "git+https://github.com/tu6ge/oss-rs.git?rev=977db3f#977db3f7ea0638154bf0f556722cdf44bc33ab5a"
 dependencies = [
  "proc-macro2",
  "quote",

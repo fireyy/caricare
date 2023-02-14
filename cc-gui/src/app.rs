@@ -3,8 +3,8 @@ use crate::widgets::item_ui;
 use crate::{OssObject, OssObjectType};
 use bytesize::ByteSize;
 use cc_core::{
-    tokio, tracing, util::get_extension, ImageCache, ImageFetcher, ObjectList, OssClient, OssError,
-    Query, UploadResult,
+    tokio, tracing, util::get_extension, History, ImageCache, ImageFetcher, ObjectList, OssClient,
+    OssError, Query, UploadResult,
 };
 use std::{path::PathBuf, sync::mpsc, vec};
 
@@ -12,9 +12,16 @@ static THUMB_LIST_WIDTH: f32 = 200.0;
 static THUMB_LIST_HEIGHT: f32 = 50.0;
 static SUPPORT_EXTENSIONS: [&str; 4] = ["png", "gif", "jpg", "svg"];
 
+enum NavgatorType {
+    Back,
+    Forward,
+    New(String),
+}
+
 enum Update {
     Uploaded(Result<Vec<UploadResult>, OssError>),
     List(Result<ObjectList, OssError>),
+    Navgator(NavgatorType),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -53,7 +60,8 @@ pub struct App {
     images: ImageCache,
     upload_result: Vec<UploadResult>,
     is_show_result: bool,
-    current_path: String,
+    // current_path: String,
+    navigator: History<String>,
 }
 
 impl App {
@@ -62,6 +70,7 @@ impl App {
         let (update_tx, update_rx) = mpsc::sync_channel(1);
 
         let current_path = oss.get_path().to_string();
+        let navigator = History::new();
 
         let images = ImageCache::new(ImageFetcher::spawn(cc.egui_ctx.clone()));
 
@@ -78,27 +87,19 @@ impl App {
             show_type: ShowType::List,
             is_preview: false,
             loading_more: false,
-            next_query: None,
+            next_query: Some(build_query(&current_path)),
             scroll_top: false,
             images,
             upload_result: vec![],
             is_show_result: false,
-            current_path,
+            // current_path,
+            navigator,
         };
 
         this.get_list(&cc.egui_ctx);
-        this.next_query = Some(this.build_query());
+        this.navigator.push(current_path);
 
         this
-    }
-
-    fn build_query(&self) -> Query {
-        let mut query = Query::new();
-        query.insert("prefix", self.current_path.clone());
-        // query.insert("prefix", "");
-        query.insert("delimiter", "/");
-        query.insert("max-keys", "40");
-        query
     }
 
     fn upload_file(&mut self, ctx: &egui::Context) {
@@ -207,6 +208,14 @@ impl App {
         }
     }
 
+    fn refresh(&mut self, ctx: &egui::Context) {
+        self.scroll_top = true;
+        let current_path = self.navigator.get_current();
+        self.next_query = Some(build_query(current_path));
+        self.list = vec![];
+        self.get_list(ctx);
+    }
+
     fn render_content(&mut self, ui: &mut egui::Ui) {
         let num_cols = match self.show_type {
             ShowType::List => 1,
@@ -269,11 +278,19 @@ impl App {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                 egui::Frame::none().show(ui, |ui| {
                     ui.set_width(120.);
-                    ui.label(&data.last_modified);
+                    ui.label(if data.last_modified.is_empty() {
+                        "-"
+                    } else {
+                        &data.last_modified
+                    });
                 });
                 egui::Frame::none().show(ui, |ui| {
                     ui.set_width(60.);
-                    ui.label(&data.size);
+                    ui.label(if data.size.is_empty() {
+                        "-"
+                    } else {
+                        &data.size
+                    });
                 });
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
                     ui.vertical(|ui| {
@@ -285,9 +302,20 @@ impl App {
                             .on_hover_text(&data.url)
                             .clicked()
                         {
-                            self.current_img = data.clone();
-                            self.is_preview = true;
-                            ui.ctx().request_repaint();
+                            match data.obj_type {
+                                OssObjectType::File => {
+                                    self.current_img = data.clone();
+                                    self.is_preview = true;
+                                    ui.ctx().request_repaint();
+                                }
+                                OssObjectType::Folder => {
+                                    self.update_tx
+                                        .send(Update::Navgator(NavgatorType::New(
+                                            data.path.clone(),
+                                        )))
+                                        .unwrap();
+                                }
+                            }
                         }
                     });
                 });
@@ -327,8 +355,30 @@ impl App {
     }
 
     fn bar_contents(&mut self, ui: &mut egui::Ui) {
+        ui.add_enabled_ui(self.navigator.can_go_backward(), |ui| {
+            if ui.button("\u{2b05}").on_hover_text("Back").clicked() {
+                self.update_tx
+                    .send(Update::Navgator(NavgatorType::Back))
+                    .unwrap();
+            }
+        });
+        ui.add_enabled_ui(!self.navigator.get_current().is_empty(), |ui| {
+            if ui.button("\u{2b06}").on_hover_text("Go Parent").clicked() {
+                // self.update_tx
+                //     .send(Update::Navgator(NavgatorType::Back))
+                //     .unwrap();
+            }
+        });
+        ui.add_enabled_ui(self.navigator.can_go_forward(), |ui| {
+            if ui.button("\u{27a1}").on_hover_text("Forward").clicked() {
+                self.update_tx
+                    .send(Update::Navgator(NavgatorType::Forward))
+                    .unwrap();
+            }
+        });
+
         if ui
-            .button("\u{2b06}")
+            .button("\u{2795}")
             .on_hover_text("Upload file...")
             .clicked()
         {
@@ -339,9 +389,6 @@ impl App {
                 self.picked_path = paths;
             }
         }
-        if ui.button("\u{2b05}").on_hover_text("Back").clicked() {
-            //
-        }
         ui.horizontal(|ui| {
             ui.set_width(25.0);
             let enabled = self.state != State::Busy(Route::List)
@@ -350,11 +397,7 @@ impl App {
 
             ui.add_enabled_ui(enabled, |ui| {
                 if ui.button("\u{1f503}").clicked() {
-                    self.scroll_top = true;
-                    let query = self.build_query();
-                    self.next_query = Some(query);
-                    self.list = vec![];
-                    self.get_list(ui.ctx());
+                    self.refresh(ui.ctx());
                 }
             });
         });
@@ -556,6 +599,24 @@ impl eframe::App for App {
                         self.err = Some(err.message());
                     }
                 },
+                Update::Navgator(nav) => {
+                    match nav {
+                        NavgatorType::Back => {
+                            if self.navigator.can_go_backward() {
+                                self.navigator.go_backward();
+                            }
+                        }
+                        NavgatorType::Forward => {
+                            if self.navigator.can_go_forward() {
+                                self.navigator.go_forward();
+                            }
+                        }
+                        NavgatorType::New(path) => {
+                            self.navigator.push(path);
+                        }
+                    }
+                    self.refresh(ctx);
+                }
             }
         }
 
@@ -626,4 +687,17 @@ fn get_name_form_path(path: &str) -> String {
         .last()
         .unwrap_or("")
         .to_string()
+}
+
+fn build_query(path: &String) -> Query {
+    let mut path = path.clone();
+    if !path.ends_with('/') && !path.is_empty() {
+        path.push_str("/");
+    }
+    let mut query = Query::new();
+    query.insert("prefix", path);
+    // query.insert("prefix", "");
+    query.insert("delimiter", "/");
+    query.insert("max-keys", "40");
+    query
 }
