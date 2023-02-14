@@ -15,16 +15,20 @@ impl<T> History<T> {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns whether you can go backwards
     #[inline]
     pub const fn can_go_backward(&self) -> bool {
-        self.index > 0usize
+        self.index > 1usize
     }
 
     /// Returns whether you can go forwards
     #[inline]
     pub fn can_go_forward(&self) -> bool {
-        0usize < self.vec.len()
+        0usize < self.vec.len() && self.index < self.len()
     }
 
     /// Go forward

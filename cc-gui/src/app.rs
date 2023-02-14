@@ -401,11 +401,7 @@ impl App {
                 }
             });
         });
-        ui.label(format!(
-            "{}({})",
-            self.oss.get_bucket_name(),
-            self.list.len()
-        ));
+        // ui.label(self.oss.get_bucket_name());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
             ui.style_mut().spacing.item_spacing.x = 0.0;
             egui::Frame {
@@ -429,6 +425,10 @@ impl App {
                     self.scroll_top = true;
                 }
             });
+            ui.add_sized(
+                ui.available_size(),
+                egui::TextEdit::singleline(&mut self.oss.get_bucket_name()),
+            );
         });
     }
     fn status_bar_contents(&mut self, ui: &mut egui::Ui) {
@@ -437,6 +437,8 @@ impl App {
         if self.loading_more {
             ui.add(egui::Spinner::new().size(12.0));
         }
+
+        ui.label(format!("Count: {}", self.list.len()));
 
         if self.next_query.is_none() && !self.loading_more {
             ui.label("No More Data.");
