@@ -183,7 +183,7 @@ impl App {
         let num_cols = match self.show_type {
             ShowType::List => 1,
             ShowType::Thumb => {
-                let w = ui.ctx().input().screen_rect().size();
+                let w = ui.ctx().input(|i| i.screen_rect().size());
                 (w.x / THUMB_LIST_WIDTH) as usize
             }
         };
@@ -195,7 +195,7 @@ impl App {
         let col_width = match self.show_type {
             ShowType::List => 1.0,
             ShowType::Thumb => {
-                let w = ui.ctx().input().screen_rect().size();
+                let w = ui.ctx().input(|i| i.screen_rect().size());
                 w.x / (num_cols as f32)
             }
         };
@@ -418,7 +418,7 @@ impl App {
             ui.available_size(),
             egui::TextEdit::singleline(&mut self.current_path),
         );
-        if response.lost_focus() && ui.input().key_pressed(egui::Key::Enter) {
+        if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
             if self.current_path != self.navigator.location() {
                 self.update_tx
                     .send(Update::Navgator(NavgatorType::New(
@@ -462,6 +462,9 @@ impl App {
         };
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+            if ui.button("\u{26ed}").clicked() {
+                //
+            }
             if ui
                 .button(egui::RichText::new("\u{1f4ac}").color(color))
                 .clicked()
@@ -490,7 +493,7 @@ impl App {
                 // .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
                 .fixed_pos(egui::Pos2::ZERO)
                 .show(ctx, |ui| {
-                    let screen_rect = ui.ctx().input().screen_rect;
+                    let screen_rect = ui.ctx().input(|i| i.screen_rect);
                     let area_response =
                         ui.allocate_response(screen_rect.size(), egui::Sense::click());
                     if area_response.clicked() {
@@ -523,7 +526,7 @@ impl App {
                                 let mut url = self.oss.get_file_url(&current_img.path);
                                 let resp = ui.add(egui::TextEdit::singleline(&mut url));
                                 if resp.on_hover_text("Click to copy").clicked() {
-                                    ui.output().copied_text = url;
+                                    ui.output_mut(|o| o.copied_text = url);
                                 }
                                 ui.horizontal(|ui| {
                                     ui.label(format!("size: {}", current_img.size));
@@ -674,8 +677,8 @@ impl eframe::App for App {
 
         self.upload_file(ctx);
 
-        if !ctx.input().raw.dropped_files.is_empty() {
-            self.dropped_files = ctx.input().raw.dropped_files.clone();
+        if !ctx.input(|i| i.raw.dropped_files.is_empty()) {
+            self.dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
         }
     }
 }

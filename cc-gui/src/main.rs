@@ -8,7 +8,7 @@ pub static SUPPORT_EXTENSIONS: [&str; 4] = ["png", "gif", "jpg", "svg"];
 pub static THUMB_LIST_WIDTH: f32 = 200.0;
 pub static THUMB_LIST_HEIGHT: f32 = 50.0;
 
-fn main() {
+fn main() -> Result<(), eframe::Error> {
     setup_tracing();
 
     runtime::start().unwrap();
@@ -22,5 +22,7 @@ fn main() {
             ..Default::default()
         },
         Box::new(|cc: &eframe::CreationContext| Box::new(app::App::new(cc))),
-    );
+    )?;
+
+    Ok(())
 }

@@ -172,7 +172,7 @@ impl Image {
                 img.show_size(ui, size);
             }
             Image::Animated(img) => {
-                let dt = ui.ctx().input().stable_dt.min(0.1);
+                let dt = ui.ctx().input(|i| i.stable_dt.min(0.1));
                 if let Some((img, delay)) = img.frame(dt) {
                     img.show_size(ui, size);
                     ui.ctx().request_repaint_after(delay);
