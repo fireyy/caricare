@@ -5,7 +5,7 @@ use cc_core::{
     tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, OssBucket,
     OssClient, OssError, OssObject, OssObjectType, Query, UploadResult,
 };
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use std::{path::PathBuf, sync::mpsc, vec};
 
 enum NavgatorType {
@@ -56,7 +56,7 @@ pub struct App {
     images: ImageCache,
     upload_result: Vec<UploadResult>,
     is_show_result: bool,
-    // current_path: String,
+    current_path: String,
     navigator: MemoryHistory,
 }
 
@@ -88,6 +88,7 @@ impl App {
             images,
             upload_result: vec![],
             is_show_result: false,
+            current_path: current_path.clone(),
             navigator,
         };
 
@@ -408,12 +409,26 @@ impl App {
                     self.scroll_top = true;
                 }
             });
-            ui.add_sized(
-                ui.available_size(),
-                egui::TextEdit::singleline(&mut self.navigator.location()),
-            );
+            self.location_bar(ui);
         });
     }
+
+    fn location_bar(&mut self, ui: &mut egui::Ui) {
+        let response = ui.add_sized(
+            ui.available_size(),
+            egui::TextEdit::singleline(&mut self.current_path),
+        );
+        if response.lost_focus() && ui.input().key_pressed(egui::Key::Enter) {
+            if self.current_path != self.navigator.location() {
+                self.update_tx
+                    .send(Update::Navgator(NavgatorType::New(
+                        self.current_path.clone(),
+                    )))
+                    .unwrap();
+            }
+        }
+    }
+
     fn status_bar_contents(&mut self, ui: &mut egui::Ui) {
         egui::widgets::global_dark_light_mode_switch(ui);
 
@@ -598,6 +613,7 @@ impl eframe::App for App {
                             self.navigator.push(path);
                         }
                     }
+                    self.current_path = self.navigator.location();
                     self.refresh(ctx);
                 }
             }
