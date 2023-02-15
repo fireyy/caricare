@@ -1,4 +1,5 @@
 use crate::theme::text_ellipsis;
+use cc_core::util::is_vaild_img;
 use cc_core::ImageCache;
 use cc_core::OssObject;
 use egui::RichText;
@@ -17,6 +18,7 @@ pub fn item_ui(
     }
     .show(ui, |ui| {
         ui.set_height(32.0);
+        ui.set_width(ui.available_width());
         ui.horizontal_centered(|ui| {
             egui::Frame {
                 ..egui::Frame::default()
@@ -24,9 +26,11 @@ pub fn item_ui(
             .show(ui, |ui| {
                 ui.set_width(32.0);
                 ui.set_height(32.0);
-                if let Some(img) = images.get(&url) {
-                    let size = egui::vec2(32.0, 32.0);
-                    img.show_size(ui, size);
+                if data.is_file() && is_vaild_img(&data.path) {
+                    if let Some(img) = images.get(&url) {
+                        let size = egui::vec2(32.0, 32.0);
+                        img.show_size(ui, size);
+                    }
                 }
             });
             ui.vertical(|ui| {

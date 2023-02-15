@@ -14,7 +14,7 @@ fn get_name_form_path(path: &str) -> String {
         .to_string()
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub enum OssObjectType {
     #[default]
     File,
@@ -68,6 +68,12 @@ impl OssObject {
     #[inline]
     pub fn size_string(&self) -> String {
         ByteSize(self.size).to_string()
+    }
+    pub fn is_file(&self) -> bool {
+        self.obj_type == OssObjectType::File
+    }
+    pub fn is_folder(&self) -> bool {
+        self.obj_type == OssObjectType::Folder
     }
 }
 

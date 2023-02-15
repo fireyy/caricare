@@ -1,14 +1,11 @@
 use crate::theme::text_ellipsis;
 use crate::widgets::item_ui;
+use crate::{SUPPORT_EXTENSIONS, THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use cc_core::{
     tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, OssBucket,
     OssClient, OssError, OssObject, OssObjectType, Query, UploadResult,
 };
 use std::{path::PathBuf, sync::mpsc, vec};
-
-static THUMB_LIST_WIDTH: f32 = 200.0;
-static THUMB_LIST_HEIGHT: f32 = 50.0;
-static SUPPORT_EXTENSIONS: [&str; 4] = ["png", "gif", "jpg", "svg"];
 
 enum NavgatorType {
     Back,
@@ -193,6 +190,13 @@ impl App {
             ShowType::Thumb => (self.list.len() as f32 / num_cols as f32).ceil() as usize,
         };
         // tracing::info!("num_rows: {}", num_rows);
+        let col_width = match self.show_type {
+            ShowType::List => 1.0,
+            ShowType::Thumb => {
+                let w = ui.ctx().input().screen_rect().size();
+                w.x / (num_cols as f32)
+            }
+        };
         let row_height = match self.show_type {
             ShowType::List => ui.text_style_height(&egui::TextStyle::Body),
             ShowType::Thumb => THUMB_LIST_HEIGHT,
@@ -215,7 +219,7 @@ impl App {
                 // tracing::info!("row_range: {:?}", row_range);
                 match self.show_type {
                     ShowType::List => self.render_list(ui, row_range),
-                    ShowType::Thumb => self.render_thumb(ui, row_range, num_cols),
+                    ShowType::Thumb => self.render_thumb(ui, row_range, num_cols, col_width),
                 }
                 let margin = ui.visuals().clip_rect_margin;
                 let current_scroll = ui.clip_rect().top() - ui.min_rect().top() + margin;
@@ -236,54 +240,58 @@ impl App {
         }
     }
 
+    fn handle_click(&mut self, data: &OssObject, ui: &mut egui::Ui) {
+        match data.obj_type {
+            OssObjectType::File => {
+                self.current_img = data.clone();
+                self.is_preview = true;
+                ui.ctx().request_repaint();
+            }
+            OssObjectType::Folder => {
+                self.update_tx
+                    .send(Update::Navgator(NavgatorType::New(data.path.clone())))
+                    .unwrap();
+            }
+        }
+    }
+
     fn render_list(&mut self, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
         for i in row_range {
-            let data = self.list.get(i).unwrap();
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                egui::Frame::none().show(ui, |ui| {
-                    ui.set_width(120.);
-                    ui.label(if data.last_modified.is_empty() {
-                        "-"
-                    } else {
-                        &data.last_modified
+            if let Some(data) = self.list.get(i) {
+                let data = data.clone();
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                    egui::Frame::none().show(ui, |ui| {
+                        ui.set_width(120.);
+                        ui.label(if data.last_modified.is_empty() {
+                            "-"
+                        } else {
+                            &data.last_modified
+                        });
                     });
-                });
-                egui::Frame::none().show(ui, |ui| {
-                    ui.set_width(60.);
-                    ui.label(if data.size.eq(&0) {
-                        "-".into()
-                    } else {
-                        data.size_string()
+                    egui::Frame::none().show(ui, |ui| {
+                        ui.set_width(60.);
+                        ui.label(if data.size.eq(&0) {
+                            "-".into()
+                        } else {
+                            data.size_string()
+                        });
                     });
-                });
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                    ui.vertical(|ui| {
-                        if ui
-                            .add(
-                                egui::Label::new(text_ellipsis(&data.name(), 1))
-                                    .sense(egui::Sense::click()),
-                            )
-                            .on_hover_text(&self.oss.get_file_url(&data.path))
-                            .clicked()
-                        {
-                            match data.obj_type {
-                                OssObjectType::File => {
-                                    self.current_img = data.clone();
-                                    self.is_preview = true;
-                                    ui.ctx().request_repaint();
-                                }
-                                OssObjectType::Folder => {
-                                    self.update_tx
-                                        .send(Update::Navgator(NavgatorType::New(
-                                            data.path.clone(),
-                                        )))
-                                        .unwrap();
-                                }
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                        ui.vertical(|ui| {
+                            if ui
+                                .add(
+                                    egui::Label::new(text_ellipsis(&data.name(), 1))
+                                        .sense(egui::Sense::click()),
+                                )
+                                .on_hover_text(data.name())
+                                .clicked()
+                            {
+                                self.handle_click(&data, ui);
                             }
-                        }
+                        });
                     });
                 });
-            });
+            }
         }
     }
 
@@ -292,13 +300,14 @@ impl App {
         ui: &mut egui::Ui,
         row_range: std::ops::Range<usize>,
         num_cols: usize,
+        col_width: f32,
     ) {
         egui::Grid::new(format!("grid"))
             .num_columns(num_cols)
-            .max_col_width(THUMB_LIST_WIDTH)
-            .min_col_width(THUMB_LIST_WIDTH)
+            .max_col_width(col_width - 9.0)
+            .min_col_width(THUMB_LIST_WIDTH - 9.0)
             .min_row_height(THUMB_LIST_HEIGHT)
-            .spacing(egui::Vec2::ZERO)
+            .spacing(egui::Vec2::new(9.0, 0.0))
             .start_row(row_range.start)
             .show(ui, |ui| {
                 for i in row_range {
@@ -306,10 +315,8 @@ impl App {
                         if let Some(d) = self.list.get(j + i * num_cols) {
                             let url = self.oss.get_file_url(&d.path);
                             let resp = item_ui(ui, d.clone(), url.clone(), &mut self.images);
-                            if resp.on_hover_text(url).clicked() {
-                                self.current_img = d.clone();
-                                self.is_preview = true;
-                                ui.ctx().request_repaint();
+                            if resp.on_hover_text(d.name()).clicked() {
+                                self.handle_click(&d.clone(), ui);
                             }
                         }
                     }
