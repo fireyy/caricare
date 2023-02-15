@@ -143,7 +143,11 @@ impl App {
 
     fn set_list(&mut self, obj: OssBucket) {
         let mut dirs = obj.common_prefixes;
-        let mut files = obj.files;
+        let mut files: Vec<OssObject> = obj
+            .files
+            .into_iter()
+            .filter(|x| !x.path.ends_with('/'))
+            .collect();
         self.list.append(&mut dirs);
         self.list.append(&mut files);
     }
