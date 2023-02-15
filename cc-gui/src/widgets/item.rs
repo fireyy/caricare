@@ -36,7 +36,12 @@ pub fn item_ui(
             ui.vertical(|ui| {
                 ui.label(text_ellipsis(&data.name(), 1));
                 ui.label(
-                    RichText::new(data.size_string()).color(ui.style().visuals.weak_text_color()),
+                    RichText::new(if data.size.eq(&0) {
+                        "Folder".into()
+                    } else {
+                        data.size_string()
+                    })
+                    .color(ui.style().visuals.weak_text_color()),
                 );
             });
         });

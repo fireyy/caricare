@@ -408,6 +408,7 @@ name = "cc-gui"
 version = "0.1.0"
 dependencies = [
  "cc-core",
+ "chrono",
  "eframe",
  "egui",
  "rfd",

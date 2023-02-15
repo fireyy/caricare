@@ -5,6 +5,7 @@ use cc_core::{
     tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, OssBucket,
     OssClient, OssError, OssObject, OssObjectType, Query, UploadResult,
 };
+use chrono::{DateTime, Utc};
 use std::{path::PathBuf, sync::mpsc, vec};
 
 enum NavgatorType {
@@ -263,15 +264,18 @@ impl App {
                     egui::Frame::none().show(ui, |ui| {
                         ui.set_width(120.);
                         ui.label(if data.last_modified.is_empty() {
-                            "-"
+                            "-".into()
                         } else {
-                            &data.last_modified
+                            match DateTime::parse_from_rfc3339(&data.last_modified) {
+                                Ok(date) => date.format("%Y-%m-%d %H:%M:%S").to_string(),
+                                Err(_) => "_".into(),
+                            }
                         });
                     });
                     egui::Frame::none().show(ui, |ui| {
                         ui.set_width(60.);
                         ui.label(if data.size.eq(&0) {
-                            "-".into()
+                            "Folder".into()
                         } else {
                             data.size_string()
                         });
@@ -382,13 +386,13 @@ impl App {
             });
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-            ui.style_mut().spacing.item_spacing.x = 0.0;
             egui::Frame {
                 fill: ui.style().visuals.widgets.inactive.bg_fill,
                 rounding: egui::Rounding::same(2.0),
                 ..egui::Frame::default()
             }
             .show(ui, |ui| {
+                ui.style_mut().spacing.item_spacing.x = 0.0;
                 ui.style_mut().visuals.button_frame = false;
                 ui.style_mut().visuals.widgets.active.rounding = egui::Rounding::same(2.0);
                 if ui
@@ -406,7 +410,7 @@ impl App {
             });
             ui.add_sized(
                 ui.available_size(),
-                egui::TextEdit::singleline(&mut self.oss.get_bucket_name()),
+                egui::TextEdit::singleline(&mut self.navigator.location()),
             );
         });
     }
