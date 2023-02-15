@@ -16,21 +16,32 @@ pub use oss::{OssClient, UploadResult};
 pub use tokio;
 pub use tracing;
 
-use tracing_subscriber::fmt;
-use tracing_subscriber::prelude::*;
-
 pub fn setup_tracing() {
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "error")
+    let mut rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned());
+
+    const LOUD_CRATES: [&str; 7] = [
+        // wgpu crates spam a lot on info level, which is really annoying
+        "naga",
+        "wgpu_core",
+        "wgpu_hal",
+        // These are quite spammy on debug, drowning out what we care about:
+        "h2",
+        "hyper",
+        "reqwest",
+        "rustls",
+    ];
+    for loud_crate in LOUD_CRATES {
+        if !rust_log.contains(&format!("{loud_crate}=")) {
+            rust_log += &format!(",{loud_crate}=warn");
+        }
     }
 
-    println!(
-        "Set logging to {}",
-        std::env::var("RUST_LOG").unwrap_or("Nothing".to_string())
-    );
-    tracing::info!("Logging initialized");
+    std::env::set_var("RUST_LOG", rust_log);
 
-    let collector = tracing_subscriber::registry().with(fmt::layer().with_writer(std::io::stdout));
+    if std::env::var("RUST_BACKTRACE").is_err() {
+        // Make sure we always produce backtraces for the (hopefully rare) cases when we crash!
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
 
-    tracing::subscriber::set_global_default(collector).expect("Unable to set a global collector");
+    tracing_subscriber::fmt::init();
 }
