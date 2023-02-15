@@ -60,6 +60,7 @@ dependencies = [
 [[package]]
 name = "aliyun-oss-client"
 version = "0.10.1"
+source = "git+https://github.com/tu6ge/oss-rs.git?rev=84a89cd#84a89cdc265be74116af4c6d2479ceb31c3ea4ea"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -385,6 +386,7 @@ version = "0.1.0"
 dependencies = [
  "aliyun-oss-client",
  "anyhow",
+ "bytesize",
  "egui",
  "egui_extras",
  "flume",
@@ -404,7 +406,6 @@ dependencies = [
 name = "cc-gui"
 version = "0.1.0"
 dependencies = [
- "bytesize",
  "cc-core",
  "eframe",
  "egui",
@@ -2298,6 +2299,7 @@ dependencies = [
 [[package]]
 name = "oss_derive"
 version = "0.9.6"
+source = "git+https://github.com/tu6ge/oss-rs.git?rev=84a89cd#84a89cdc265be74116af4c6d2479ceb31c3ea4ea"
 dependencies = [
  "proc-macro2",
  "quote",

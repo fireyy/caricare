@@ -4,23 +4,6 @@ mod app;
 mod theme;
 mod widgets;
 
-#[derive(Clone, Default)]
-pub enum OssObjectType {
-    #[default]
-    File,
-    Folder,
-}
-
-#[derive(Clone, Default)]
-pub struct OssObject {
-    pub obj_type: OssObjectType,
-    pub name: String,
-    pub path: String,
-    pub url: String,
-    pub size: String,
-    pub last_modified: String,
-}
-
 fn main() {
     setup_tracing();
 

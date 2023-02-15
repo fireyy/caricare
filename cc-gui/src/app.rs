@@ -1,10 +1,8 @@
 use crate::theme::text_ellipsis;
 use crate::widgets::item_ui;
-use crate::{OssObject, OssObjectType};
-use bytesize::ByteSize;
 use cc_core::{
-    tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, ObjectList,
-    OssClient, OssError, Query, UploadResult,
+    tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, OssBucket,
+    OssClient, OssError, OssObject, OssObjectType, Query, UploadResult,
 };
 use std::{path::PathBuf, sync::mpsc, vec};
 
@@ -20,7 +18,7 @@ enum NavgatorType {
 
 enum Update {
     Uploaded(Result<Vec<UploadResult>, OssError>),
-    List(Result<ObjectList, OssError>),
+    List(Result<OssBucket, OssError>),
     Navgator(NavgatorType),
 }
 
@@ -123,7 +121,6 @@ impl App {
     }
 
     fn get_list(&mut self, ctx: &egui::Context) {
-        // TODO: use `ObjectList::get_next_list`
         if let Some(query) = &self.next_query {
             if !self.loading_more {
                 self.state = State::Busy(Route::List);
@@ -144,42 +141,9 @@ impl App {
         }
     }
 
-    fn set_list(&mut self, obj: ObjectList) {
-        let mut dirs: Vec<OssObject> = obj
-            .common_prefixes()
-            .iter()
-            .map(|x| x.to_str())
-            .filter(|x| x.ne(&"/"))
-            .map(|x| {
-                let name = get_name_form_path(x);
-                OssObject {
-                    obj_type: OssObjectType::Folder,
-                    name,
-                    path: x.to_string(),
-                    ..Default::default()
-                }
-            })
-            .collect();
-
-        let mut files: Vec<OssObject> = obj
-            .object_list
-            .iter()
-            .map(|data| {
-                let path = data.path_string();
-                let url = self.oss.get_file_url(&path);
-                let name = get_name_form_path(&path);
-
-                OssObject {
-                    obj_type: OssObjectType::File,
-                    name,
-                    path,
-                    url,
-                    size: format!("{}", ByteSize(data.size())),
-                    last_modified: data.last_modified().format("%Y-%m-%d %H:%M:%S").to_string(),
-                }
-            })
-            .collect();
-
+    fn set_list(&mut self, obj: OssBucket) {
+        let mut dirs = obj.common_prefixes;
+        let mut files = obj.files;
         self.list.append(&mut dirs);
         self.list.append(&mut files);
     }
@@ -194,6 +158,7 @@ impl App {
     }
 
     fn refresh(&mut self, ctx: &egui::Context) {
+        self.err = None;
         self.scroll_top = true;
         let current_path = self.navigator.location();
         self.next_query = Some(build_query(current_path));
@@ -202,6 +167,16 @@ impl App {
     }
 
     fn render_content(&mut self, ui: &mut egui::Ui) {
+        if let Some(err) = &self.err {
+            ui.centered_and_justified(|ui| {
+                ui.label(egui::RichText::new(err).color(egui::Color32::RED))
+            });
+            return;
+        }
+        if self.list.is_empty() {
+            ui.centered_and_justified(|ui| ui.heading("Nothing Here."));
+            return;
+        }
         let num_cols = match self.show_type {
             ShowType::List => 1,
             ShowType::Thumb => {
@@ -271,20 +246,20 @@ impl App {
                 });
                 egui::Frame::none().show(ui, |ui| {
                     ui.set_width(60.);
-                    ui.label(if data.size.is_empty() {
-                        "-"
+                    ui.label(if data.size.eq(&0) {
+                        "-".into()
                     } else {
-                        &data.size
+                        data.size_string()
                     });
                 });
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
                     ui.vertical(|ui| {
                         if ui
                             .add(
-                                egui::Label::new(text_ellipsis(&data.name, 1))
+                                egui::Label::new(text_ellipsis(&data.name(), 1))
                                     .sense(egui::Sense::click()),
                             )
-                            .on_hover_text(&data.url)
+                            .on_hover_text(&self.oss.get_file_url(&data.path))
                             .clicked()
                         {
                             match data.obj_type {
@@ -325,8 +300,8 @@ impl App {
                 for i in row_range {
                     for j in 0..num_cols {
                         if let Some(d) = self.list.get(j + i * num_cols) {
-                            let url = d.url.clone();
-                            let resp = item_ui(ui, d.clone(), &mut self.images);
+                            let url = self.oss.get_file_url(&d.path);
+                            let resp = item_ui(ui, d.clone(), url.clone(), &mut self.images);
                             if resp.on_hover_text(url).clicked() {
                                 self.current_img = d.clone();
                                 self.is_preview = true;
@@ -349,7 +324,18 @@ impl App {
         });
         ui.add_enabled_ui(!self.navigator.location().is_empty(), |ui| {
             if ui.button("\u{2b06}").on_hover_text("Go Parent").clicked() {
-                //
+                let mut parent = String::from("");
+                let mut current = self.navigator.location();
+                if current.ends_with('/') {
+                    current.pop();
+                }
+                if let Some(index) = current.rfind('/') {
+                    current.truncate(index);
+                    parent = current;
+                }
+                self.update_tx
+                    .send(Update::Navgator(NavgatorType::New(parent)))
+                    .unwrap();
             }
         });
         ui.add_enabled_ui(self.navigator.can_go_forward(), |ui| {
@@ -423,7 +409,7 @@ impl App {
         ui.label(format!("Count: {}", self.list.len()));
 
         if self.next_query.is_none() && !self.loading_more {
-            ui.label("No More Data.");
+            // ui.label("No More Data.");
         }
 
         match &mut self.state {
@@ -436,10 +422,6 @@ impl App {
                     ui.label("Getting file list...");
                 }
             },
-        }
-
-        if let Some(err) = &self.err {
-            ui.label(egui::RichText::new(err).color(egui::Color32::RED));
         }
 
         let style = &ui.style().visuals;
@@ -466,7 +448,9 @@ impl App {
             ..
         } = self;
 
-        if current_img.url.is_empty() {
+        let url = self.oss.get_file_url(&current_img.path);
+
+        if url.is_empty() {
             return;
         }
 
@@ -499,7 +483,7 @@ impl App {
                                 .auto_shrink([false; 2])
                                 .max_height(win_size.y - 100.0)
                                 .show(ui, |ui| {
-                                    if let Some(img) = self.images.get(&current_img.url) {
+                                    if let Some(img) = self.images.get(&url) {
                                         let mut size = img.size_vec2();
                                         size *= (ui.available_width() / size.x).min(1.0);
                                         img.show_size(ui, size);
@@ -663,14 +647,6 @@ impl eframe::App for App {
             self.dropped_files = ctx.input().raw.dropped_files.clone();
         }
     }
-}
-
-fn get_name_form_path(path: &str) -> String {
-    path.split('/')
-        .filter(|k| !k.is_empty())
-        .last()
-        .unwrap_or("")
-        .to_string()
 }
 
 fn build_query(path: String) -> Query {

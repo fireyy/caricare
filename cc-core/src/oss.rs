@@ -1,11 +1,13 @@
 use crate::util::get_extension;
+use crate::{OssBucket, OssObject};
 use aliyun_oss_client::{
     errors::OssError,
     file::{FileAs, FileError},
     object::ObjectList,
-    Client, Query,
+    BucketName, Client, Query,
 };
 use md5;
+use std::env;
 use std::path::PathBuf;
 
 pub enum UploadResult {
@@ -96,7 +98,31 @@ impl OssClient {
         Ok(results)
     }
 
-    pub async fn get_list(self, query: Query) -> Result<ObjectList, OssError> {
+    pub async fn get_list(self, query: Query) -> Result<OssBucket, OssError> {
+        let mut bucket = OssBucket::default();
+        let bucket_name = env::var("ALIYUN_BUCKET").unwrap();
+        let init_file = || OssObject::default();
+
+        tracing::debug!("Query: {:?}", query);
+
+        let res: Result<_, OssError> = self
+            .client
+            .base_object_list(
+                bucket_name.parse::<BucketName>().unwrap(),
+                query,
+                &mut bucket,
+                init_file,
+            )
+            .await;
+
+        res?;
+
+        tracing::debug!("Result: {:?}", bucket);
+
+        Ok(bucket)
+    }
+
+    pub async fn get_list2(self, query: Query) -> Result<ObjectList, OssError> {
         let result = self.client.get_object_list(query).await;
         tracing::info!("Result: {:?}", result);
         result
