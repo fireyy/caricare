@@ -71,10 +71,6 @@ impl LocationStack {
 }
 
 /// A [`History`] that is implemented with in memory history stack and is usable in most targets.
-///
-/// # Panics
-///
-/// MemoryHistory does not support relative paths and will panic if routes are not starting with `/`.
 #[derive(Clone, Default)]
 pub struct MemoryHistory {
     inner: Rc<RefCell<LocationStack>>,
@@ -93,7 +89,6 @@ impl fmt::Debug for MemoryHistory {
 }
 
 impl MemoryHistory {
-    /// Creates a new [`MemoryHistory`] with a default entry of '/'.
     pub fn new() -> Self {
         Self::default()
     }
@@ -147,5 +142,9 @@ impl MemoryHistory {
 
     pub fn location(&self) -> String {
         self.inner.borrow().current()
+    }
+
+    pub fn clear(&self) {
+        self.inner.take();
     }
 }

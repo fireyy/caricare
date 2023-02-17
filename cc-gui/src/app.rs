@@ -1,9 +1,12 @@
 use crate::theme::text_ellipsis;
-use crate::widgets::item_ui;
+use crate::widgets::{
+    confirm::{Confirm, ConfirmAction},
+    item_ui, password,
+};
 use crate::{SUPPORT_EXTENSIONS, THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use cc_core::{
-    tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, OssBucket,
-    OssClient, OssError, OssObject, OssObjectType, Query, UploadResult,
+    store, tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, OssBucket,
+    OssClient, OssError, OssObject, OssObjectType, Query, Session, UploadResult,
 };
 use chrono::DateTime;
 use std::{path::PathBuf, sync::mpsc, vec};
@@ -36,14 +39,16 @@ enum State {
 enum Route {
     Upload,
     List,
+    Auth,
 }
 
 pub struct App {
-    oss: OssClient,
+    oss: Option<OssClient>,
     list: Vec<OssObject>,
     current_img: OssObject,
     update_tx: mpsc::SyncSender<Update>,
     update_rx: mpsc::Receiver<Update>,
+    confirm_rx: mpsc::Receiver<ConfirmAction>,
     state: State,
     err: Option<String>,
     dropped_files: Vec<egui::DroppedFile>,
@@ -58,17 +63,40 @@ pub struct App {
     is_show_result: bool,
     current_path: String,
     navigator: MemoryHistory,
+    confirm: Confirm,
+    session: Session,
 }
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let oss = OssClient::new().expect("env variable not found");
-        let (update_tx, update_rx) = mpsc::sync_channel(1);
+        let session = match store::get_latest_session() {
+            Some(session) => session,
+            None => Session::default(),
+        };
+        let mut oss = None;
 
-        let current_path = oss.get_path().to_string();
+        let (update_tx, update_rx) = mpsc::sync_channel(1);
+        let (confirm_tx, confirm_rx) = mpsc::sync_channel(1);
+
+        let mut current_path = String::from("");
         let navigator = MemoryHistory::new();
 
         let images = ImageCache::new(ImageFetcher::spawn(cc.egui_ctx.clone()));
+
+        let mut state = State::Idle(Route::List);
+
+        if !session.is_empty() {
+            match OssClient::new(&session) {
+                Ok(client) => {
+                    current_path = client.get_path().to_string();
+                    oss = Some(client);
+                    navigator.push(current_path.clone());
+                }
+                Err(err) => tracing::error!("{:?}", err),
+            }
+        } else {
+            state = State::Idle(Route::Auth);
+        }
 
         let mut this = Self {
             oss,
@@ -76,7 +104,8 @@ impl App {
             list: vec![],
             update_tx,
             update_rx,
-            state: State::Idle(Route::List),
+            confirm_rx,
+            state,
             err: None,
             dropped_files: vec![],
             picked_path: vec![],
@@ -90,12 +119,23 @@ impl App {
             is_show_result: false,
             current_path: current_path.clone(),
             navigator,
+            confirm: Confirm::new(confirm_tx),
+            session,
         };
 
-        this.get_list(&cc.egui_ctx);
-        this.navigator.push(current_path);
+        if this.oss.is_some() {
+            this.get_list(&cc.egui_ctx);
+        }
 
         this
+    }
+
+    fn oss(&self) -> &OssClient {
+        self.oss.as_ref().expect("Oss not initialized yet")
+    }
+
+    fn get_oss_url(&self, path: &String) -> String {
+        self.oss().get_file_url(path)
     }
 
     fn upload_file(&mut self, ctx: &egui::Context) {
@@ -108,7 +148,7 @@ impl App {
 
         let update_tx = self.update_tx.clone();
         let ctx = ctx.clone();
-        let oss = self.oss.clone();
+        let oss = self.oss().clone();
 
         cc_core::runtime::spawn(async move {
             tokio::spawn(async move {
@@ -128,7 +168,7 @@ impl App {
             let update_tx = self.update_tx.clone();
             let ctx = ctx.clone();
             let query = query.clone();
-            let oss = self.oss.clone();
+            let oss = self.oss().clone();
 
             cc_core::runtime::spawn(async move {
                 tokio::spawn(async move {
@@ -167,6 +207,46 @@ impl App {
         self.next_query = Some(build_query(current_path));
         self.list = vec![];
         self.get_list(ctx);
+    }
+
+    fn save_auth(&mut self, ctx: &egui::Context) {
+        match OssClient::new(&self.session) {
+            Ok(client) => {
+                store::put_session(self.session.clone());
+                let current_path = client.get_path().to_string();
+                self.current_path = current_path.clone();
+                self.navigator.push(current_path);
+                self.oss = Some(client);
+                self.refresh(ctx);
+            }
+            Err(err) => tracing::error!("{:?}", err),
+        }
+    }
+
+    fn render_auth(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("auth_grid")
+            .spacing([10.0; 2])
+            .num_columns(2)
+            .show(ui, |ui| {
+                ui.label("Endpoint:");
+                ui.text_edit_singleline(&mut self.session.endpoint);
+                ui.end_row();
+                ui.label("AccessKeyId:");
+                ui.text_edit_singleline(&mut self.session.key_id);
+                ui.end_row();
+                ui.label("AccessKeySecret:");
+                ui.add(password(&mut self.session.key_secret));
+                ui.end_row();
+                ui.label("Bucket:");
+                ui.text_edit_singleline(&mut self.session.bucket);
+                ui.end_row();
+                ui.label("Note:");
+                ui.text_edit_singleline(&mut self.session.note);
+            });
+
+        if ui.button("Save").clicked() {
+            self.save_auth(ui.ctx());
+        }
     }
 
     fn render_content(&mut self, ui: &mut egui::Ui) {
@@ -318,7 +398,7 @@ impl App {
                 for i in row_range {
                     for j in 0..num_cols {
                         if let Some(d) = self.list.get(j + i * num_cols) {
-                            let url = self.oss.get_file_url(&d.path);
+                            let url = self.get_oss_url(&d.path);
                             let resp = item_ui(ui, d.clone(), url.clone(), &mut self.images);
                             if resp.on_hover_text(d.name()).clicked() {
                                 self.handle_click(&d.clone(), ui);
@@ -451,6 +531,7 @@ impl App {
                 Route::List => {
                     ui.label("Getting file list...");
                 }
+                _ => {}
             },
         }
 
@@ -462,8 +543,9 @@ impl App {
         };
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-            if ui.button("\u{26ed}").clicked() {
-                //
+            if ui.button("\u{1f464}").on_hover_text("Logout").clicked() {
+                self.confirm
+                    .show("Do you confirm to logout?", ConfirmAction::Logout);
             }
             if ui
                 .button(egui::RichText::new("\u{1f4ac}").color(color))
@@ -475,19 +557,13 @@ impl App {
     }
 
     fn show_image(&mut self, ctx: &egui::Context) {
-        let Self {
-            mut is_preview,
-            current_img,
-            ..
-        } = self;
-
-        let url = self.oss.get_file_url(&current_img.path);
+        let url = self.get_oss_url(&self.current_img.path);
 
         if url.is_empty() {
             return;
         }
 
-        if is_preview {
+        if self.is_preview {
             egui::Area::new("preview_area")
                 // .order(egui::Order::Foreground)
                 // .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
@@ -507,7 +583,7 @@ impl App {
                     let win_size = screen_rect.size();
                     let response = egui::Window::new("")
                         .id(egui::Id::new("preview_win"))
-                        .open(&mut is_preview)
+                        .open(&mut self.is_preview)
                         .title_bar(false)
                         .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
                         .resizable(false)
@@ -523,14 +599,14 @@ impl App {
                                     }
                                 });
                             ui.vertical_centered_justified(|ui| {
-                                let mut url = self.oss.get_file_url(&current_img.path);
+                                let mut url = url;
                                 let resp = ui.add(egui::TextEdit::singleline(&mut url));
                                 if resp.on_hover_text("Click to copy").clicked() {
                                     ui.output_mut(|o| o.copied_text = url);
                                 }
                                 ui.horizontal(|ui| {
-                                    ui.label(format!("size: {}", current_img.size));
-                                    ui.label(&current_img.last_modified);
+                                    ui.label(format!("size: {}", self.current_img.size));
+                                    ui.label(&self.current_img.last_modified);
                                 });
                             });
                         });
@@ -570,11 +646,26 @@ impl App {
                 });
         }
     }
+
+    fn init_confirm(&mut self, ctx: &egui::Context) {
+        self.confirm.init(ctx);
+        while let Ok(action) = self.confirm_rx.try_recv() {
+            match action {
+                ConfirmAction::Logout => {
+                    self.state = State::Idle(Route::Auth);
+                    self.oss = None;
+                    self.current_path = String::from("");
+                    self.navigator.clear();
+                }
+            }
+        }
+    }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.images.poll();
+        self.init_confirm(ctx);
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
                 Update::Uploaded(result) => match result {
@@ -647,6 +738,7 @@ impl eframe::App for App {
                         State::Idle(ref mut route) => match route {
                             Route::Upload => {}
                             Route::List => self.render_content(ui),
+                            Route::Auth => self.render_auth(ui),
                         },
                         State::Busy(_) => {
                             ui.centered_and_justified(|ui| {
@@ -657,8 +749,10 @@ impl eframe::App for App {
                 });
         });
 
-        self.show_image(ctx);
-        self.show_result(ctx);
+        if self.oss.is_some() {
+            self.show_image(ctx);
+            self.show_result(ctx);
+        }
 
         if !self.dropped_files.is_empty() {
             let mut files = vec![];

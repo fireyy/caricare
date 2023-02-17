@@ -1,4 +1,4 @@
-use cc_core::{runtime, setup_tracing};
+use cc_core::init_core;
 
 mod app;
 mod theme;
@@ -9,9 +9,7 @@ pub static THUMB_LIST_WIDTH: f32 = 200.0;
 pub static THUMB_LIST_HEIGHT: f32 = 50.0;
 
 fn main() -> Result<(), eframe::Error> {
-    setup_tracing();
-
-    runtime::start().unwrap();
+    init_core();
 
     eframe::run_native(
         "Caricare",

@@ -1,22 +1,27 @@
+mod error;
 mod history;
 mod image_cache;
 mod object;
 mod oss;
 pub mod runtime;
+mod session;
+pub mod store;
 pub mod util;
 pub use aliyun_oss_client::{
     errors::OssError,
     object::{Object, ObjectList},
     Query,
 };
+pub use error::CoreError;
 pub use history::MemoryHistory;
 pub use image_cache::{ImageCache, ImageFetcher};
 pub use object::{OssBucket, OssObject, OssObjectType};
 pub use oss::{OssClient, UploadResult};
+pub use session::Session;
 pub use tokio;
 pub use tracing;
 
-pub fn setup_tracing() {
+pub fn init_core() {
     let mut rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned());
 
     const LOUD_CRATES: [&str; 7] = [
@@ -44,4 +49,9 @@ pub fn setup_tracing() {
     }
 
     tracing_subscriber::fmt::init();
+
+    runtime::start().unwrap();
+
+    let content_store = store::ContentStore::default();
+    content_store.create_req_dirs().unwrap();
 }

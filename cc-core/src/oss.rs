@@ -1,5 +1,5 @@
 use crate::util::get_extension;
-use crate::{OssBucket, OssObject};
+use crate::{CoreError, OssBucket, OssObject, Session};
 use aliyun_oss_client::{
     errors::OssError,
     file::{FileAs, FileError},
@@ -7,7 +7,6 @@ use aliyun_oss_client::{
     BucketName, Client, Query,
 };
 use md5;
-use std::env;
 use std::path::PathBuf;
 
 pub enum UploadResult {
@@ -17,20 +16,26 @@ pub enum UploadResult {
 
 #[derive(Default, Clone)]
 pub struct OssClient {
+    session: Session,
     path: String,
     url: String,
     client: Client,
 }
 
 impl OssClient {
-    pub fn new() -> Result<Self, OssError> {
-        simple_env_load::load_env_from(&[".env"]);
+    pub fn new(session: &Session) -> Result<Self, CoreError> {
         let path = std::env::var("ALIYUN_BUCKET_PATH").unwrap_or("".to_string());
         let url = std::env::var("CDN_URL").unwrap_or("".to_string());
+        let config = session.clone().config()?;
 
-        let client = Client::from_env()?;
+        let client = Client::from_config(config);
 
-        Ok(Self { path, url, client })
+        Ok(Self {
+            path,
+            url,
+            client,
+            session: session.clone(),
+        })
     }
 
     // pub fn get_bucket_domain(&self) -> String {
@@ -100,7 +105,7 @@ impl OssClient {
 
     pub async fn get_list(self, query: Query) -> Result<OssBucket, OssError> {
         let mut bucket = OssBucket::default();
-        let bucket_name = env::var("ALIYUN_BUCKET").unwrap();
+        let bucket_name = self.session.bucket;
         let init_file = || OssObject::default();
 
         tracing::debug!("Query: {:?}", query);

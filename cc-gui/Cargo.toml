@@ -11,3 +11,4 @@ eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
 egui = "0.21.0"
 rfd = "0.10"
 chrono = "0.4"
+egui-modal = "0.2.1"
