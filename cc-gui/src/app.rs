@@ -224,29 +224,34 @@ impl App {
     }
 
     fn render_auth(&mut self, ui: &mut egui::Ui) {
-        egui::Grid::new("auth_grid")
-            .spacing([10.0; 2])
-            .num_columns(2)
+        egui::Frame::none()
+            // .inner_margin(egui::style::Margin::same(0.0))
             .show(ui, |ui| {
-                ui.label("Endpoint:");
-                ui.text_edit_singleline(&mut self.session.endpoint);
-                ui.end_row();
-                ui.label("AccessKeyId:");
-                ui.text_edit_singleline(&mut self.session.key_id);
-                ui.end_row();
-                ui.label("AccessKeySecret:");
-                ui.add(password(&mut self.session.key_secret));
-                ui.end_row();
-                ui.label("Bucket:");
-                ui.text_edit_singleline(&mut self.session.bucket);
-                ui.end_row();
-                ui.label("Note:");
-                ui.text_edit_singleline(&mut self.session.note);
-            });
+                egui::Grid::new("auth_grid")
+                    .spacing([10.0; 2])
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        ui.label("Endpoint:");
+                        ui.text_edit_singleline(&mut self.session.endpoint);
+                        ui.end_row();
+                        ui.label("AccessKeyId:");
+                        ui.text_edit_singleline(&mut self.session.key_id);
+                        ui.end_row();
+                        ui.label("AccessKeySecret:");
+                        ui.add(password(&mut self.session.key_secret));
+                        ui.end_row();
+                        ui.label("Bucket:");
+                        ui.text_edit_singleline(&mut self.session.bucket);
+                        ui.end_row();
+                        ui.label("Note:");
+                        ui.text_edit_singleline(&mut self.session.note);
+                    });
 
-        if ui.button("Save").clicked() {
-            self.save_auth(ui.ctx());
-        }
+                ui.add_space(20.0);
+                if ui.button("Save").clicked() {
+                    self.save_auth(ui.ctx());
+                }
+            });
     }
 
     fn render_content(&mut self, ui: &mut egui::Ui) {
@@ -664,6 +669,16 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        match &mut self.state {
+            State::Idle(ref mut route) => match route {
+                Route::Auth => {
+                    egui::CentralPanel::default().show(ctx, |ui| self.render_auth(ui));
+                    return;
+                }
+                _ => {}
+            },
+            _ => {}
+        };
         self.images.poll();
         self.init_confirm(ctx);
         while let Ok(update) = self.update_rx.try_recv() {
@@ -738,7 +753,7 @@ impl eframe::App for App {
                         State::Idle(ref mut route) => match route {
                             Route::Upload => {}
                             Route::List => self.render_content(ui),
-                            Route::Auth => self.render_auth(ui),
+                            _ => {}
                         },
                         State::Busy(_) => {
                             ui.centered_and_justified(|ui| {
