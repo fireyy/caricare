@@ -1,8 +1,29 @@
 [workspace]
+resolver = "2"
 members = [
-    "cc-core",
-    "cc-gui"
+    "crates/*",
+    "caricare_native",
+    "caricare_web",
 ]
 
+[workspace.package]
+authors = ["fireyy zhu <fireyy@gmail.com>"]
+edition = "2021"
+include = ["**/*.rs", "Cargo.toml"]
+rust-version = "1.67"
+version = "0.1.0"
+
+[workspace.dependencies]
+cc_core = { path = "crates/cc_core" }
+cc_gui = { path = "crates/cc_gui" }
+eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
+
 [profile.dev]
-split-debuginfo = "unpacked"
+opt-level = 1 # Make debug builds run faster
+
+# Optimize all dependencies even in debug builds (does not affect workspace packages):
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+# debug = true # good for profilers

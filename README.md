@@ -7,11 +7,11 @@
 ### Develop
 
 ```
-cargo run -p cc-gui
+cargo run -p caricare_native
 ```
 
-### Build
+### Build for MacOS
 
 ```
-cargo build -p cc-gui
+sh ./caricare_native/build_mac.sh
 ```

@@ -1,12 +1,12 @@
 [package]
-name = "cc-gui"
+name = "cc_gui"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cc-core = { path="../cc-core" }
+cc_core = { workspace = true }
 eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
 egui = "0.21.0"
 rfd = "0.10"
