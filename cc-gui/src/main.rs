@@ -1,6 +1,7 @@
 use cc_core::init_core;
 
 mod app;
+mod state;
 mod theme;
 mod widgets;
 

@@ -1,226 +1,24 @@
+use crate::state::{NavgatorType, Route, ShowType, State, Status, Update};
 use crate::theme::text_ellipsis;
-use crate::widgets::{
-    confirm::{Confirm, ConfirmAction},
-    item_ui, password,
-};
+use crate::widgets::{confirm::ConfirmAction, item_ui, password};
 use crate::{SUPPORT_EXTENSIONS, THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
-use cc_core::{
-    store, tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, OssBucket,
-    OssClient, OssError, OssObject, OssObjectType, Query, Session, UploadResult,
-};
+use cc_core::{OssObject, OssObjectType};
 use chrono::DateTime;
-use std::{path::PathBuf, sync::mpsc, vec};
-
-enum NavgatorType {
-    Back,
-    Forward,
-    New(String),
-}
-
-enum Update {
-    Uploaded(Result<Vec<UploadResult>, OssError>),
-    List(Result<OssBucket, OssError>),
-    Navgator(NavgatorType),
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum ShowType {
-    List,
-    Thumb,
-}
-
-#[derive(PartialEq)]
-enum State {
-    Idle(Route),
-    Busy(Route),
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Route {
-    Upload,
-    List,
-    Auth,
-}
 
 pub struct App {
-    oss: Option<OssClient>,
-    list: Vec<OssObject>,
-    current_img: OssObject,
-    update_tx: mpsc::SyncSender<Update>,
-    update_rx: mpsc::Receiver<Update>,
-    confirm_rx: mpsc::Receiver<ConfirmAction>,
     state: State,
-    err: Option<String>,
-    dropped_files: Vec<egui::DroppedFile>,
-    picked_path: Vec<PathBuf>,
-    show_type: ShowType,
-    is_preview: bool,
-    loading_more: bool,
-    next_query: Option<Query>,
-    scroll_top: bool,
-    images: ImageCache,
-    upload_result: Vec<UploadResult>,
-    is_show_result: bool,
-    current_path: String,
-    navigator: MemoryHistory,
-    confirm: Confirm,
-    session: Session,
 }
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let session = match store::get_latest_session() {
-            Some(session) => session,
-            None => Session::default(),
-        };
-        let mut oss = None;
+        let state = State::new(&cc.egui_ctx);
+        let mut this = Self { state };
 
-        let (update_tx, update_rx) = mpsc::sync_channel(1);
-        let (confirm_tx, confirm_rx) = mpsc::sync_channel(1);
-
-        let mut current_path = String::from("");
-        let navigator = MemoryHistory::new();
-
-        let images = ImageCache::new(ImageFetcher::spawn(cc.egui_ctx.clone()));
-
-        let mut state = State::Idle(Route::List);
-
-        if !session.is_empty() {
-            match OssClient::new(&session) {
-                Ok(client) => {
-                    current_path = client.get_path().to_string();
-                    oss = Some(client);
-                    navigator.push(current_path.clone());
-                }
-                Err(err) => tracing::error!("{:?}", err),
-            }
-        } else {
-            state = State::Idle(Route::Auth);
-        }
-
-        let mut this = Self {
-            oss,
-            current_img: OssObject::default(),
-            list: vec![],
-            update_tx,
-            update_rx,
-            confirm_rx,
-            state,
-            err: None,
-            dropped_files: vec![],
-            picked_path: vec![],
-            show_type: ShowType::List,
-            is_preview: false,
-            loading_more: false,
-            next_query: Some(build_query(current_path.clone())),
-            scroll_top: false,
-            images,
-            upload_result: vec![],
-            is_show_result: false,
-            current_path: current_path.clone(),
-            navigator,
-            confirm: Confirm::new(confirm_tx),
-            session,
-        };
-
-        if this.oss.is_some() {
-            this.get_list(&cc.egui_ctx);
+        if this.state.oss.is_some() {
+            this.state.get_list(&cc.egui_ctx);
         }
 
         this
-    }
-
-    fn oss(&self) -> &OssClient {
-        self.oss.as_ref().expect("Oss not initialized yet")
-    }
-
-    fn get_oss_url(&self, path: &String) -> String {
-        self.oss().get_file_url(path)
-    }
-
-    fn upload_file(&mut self, ctx: &egui::Context) {
-        if self.picked_path.is_empty() {
-            return;
-        }
-        let picked_path = self.picked_path.clone();
-        self.picked_path = vec![];
-        self.state = State::Busy(Route::Upload);
-
-        let update_tx = self.update_tx.clone();
-        let ctx = ctx.clone();
-        let oss = self.oss().clone();
-
-        cc_core::runtime::spawn(async move {
-            tokio::spawn(async move {
-                let res = oss.put_multi(picked_path).await;
-                update_tx.send(Update::Uploaded(res)).unwrap();
-                ctx.request_repaint();
-            });
-        });
-    }
-
-    fn get_list(&mut self, ctx: &egui::Context) {
-        if let Some(query) = &self.next_query {
-            if !self.loading_more {
-                self.state = State::Busy(Route::List);
-            }
-
-            let update_tx = self.update_tx.clone();
-            let ctx = ctx.clone();
-            let query = query.clone();
-            let oss = self.oss().clone();
-
-            cc_core::runtime::spawn(async move {
-                tokio::spawn(async move {
-                    let res = oss.get_list(query).await;
-                    update_tx.send(Update::List(res)).unwrap();
-                    ctx.request_repaint();
-                });
-            });
-        }
-    }
-
-    fn set_list(&mut self, obj: OssBucket) {
-        let mut dirs = obj.common_prefixes;
-        let mut files: Vec<OssObject> = obj
-            .files
-            .into_iter()
-            .filter(|x| !x.path.ends_with('/'))
-            .collect();
-        self.list.append(&mut dirs);
-        self.list.append(&mut files);
-    }
-
-    fn load_more(&mut self, ctx: &egui::Context) {
-        tracing::info!("load more!");
-        if self.next_query.is_some() {
-            self.get_list(ctx);
-        } else {
-            //no more
-        }
-    }
-
-    fn refresh(&mut self, ctx: &egui::Context) {
-        self.err = None;
-        self.scroll_top = true;
-        let current_path = self.navigator.location();
-        self.next_query = Some(build_query(current_path));
-        self.list = vec![];
-        self.get_list(ctx);
-    }
-
-    fn save_auth(&mut self, ctx: &egui::Context) {
-        match OssClient::new(&self.session) {
-            Ok(client) => {
-                store::put_session(self.session.clone());
-                let current_path = client.get_path().to_string();
-                self.current_path = current_path.clone();
-                self.navigator.push(current_path);
-                self.oss = Some(client);
-                self.refresh(ctx);
-            }
-            Err(err) => tracing::error!("{:?}", err),
-        }
     }
 
     fn render_auth(&mut self, ui: &mut egui::Ui) {
@@ -232,59 +30,59 @@ impl App {
                     .num_columns(2)
                     .show(ui, |ui| {
                         ui.label("Endpoint:");
-                        ui.text_edit_singleline(&mut self.session.endpoint);
+                        ui.text_edit_singleline(&mut self.state.session.endpoint);
                         ui.end_row();
                         ui.label("AccessKeyId:");
-                        ui.text_edit_singleline(&mut self.session.key_id);
+                        ui.text_edit_singleline(&mut self.state.session.key_id);
                         ui.end_row();
                         ui.label("AccessKeySecret:");
-                        ui.add(password(&mut self.session.key_secret));
+                        ui.add(password(&mut self.state.session.key_secret));
                         ui.end_row();
                         ui.label("Bucket:");
-                        ui.text_edit_singleline(&mut self.session.bucket);
+                        ui.text_edit_singleline(&mut self.state.session.bucket);
                         ui.end_row();
                         ui.label("Note:");
-                        ui.text_edit_singleline(&mut self.session.note);
+                        ui.text_edit_singleline(&mut self.state.session.note);
                     });
 
                 ui.add_space(20.0);
                 if ui.button("Save").clicked() {
-                    self.save_auth(ui.ctx());
+                    self.state.save_auth(ui.ctx());
                 }
             });
     }
 
     fn render_content(&mut self, ui: &mut egui::Ui) {
-        if let Some(err) = &self.err {
+        if let Some(err) = &self.state.err {
             ui.centered_and_justified(|ui| {
                 ui.label(egui::RichText::new(err).color(egui::Color32::RED))
             });
             return;
         }
-        if self.list.is_empty() {
+        if self.state.list.is_empty() {
             ui.centered_and_justified(|ui| ui.heading("Nothing Here."));
             return;
         }
-        let num_cols = match self.show_type {
+        let num_cols = match self.state.show_type {
             ShowType::List => 1,
             ShowType::Thumb => {
                 let w = ui.ctx().input(|i| i.screen_rect().size());
                 (w.x / THUMB_LIST_WIDTH) as usize
             }
         };
-        let num_rows = match self.show_type {
-            ShowType::List => self.list.len(),
-            ShowType::Thumb => (self.list.len() as f32 / num_cols as f32).ceil() as usize,
+        let num_rows = match self.state.show_type {
+            ShowType::List => self.state.list.len(),
+            ShowType::Thumb => (self.state.list.len() as f32 / num_cols as f32).ceil() as usize,
         };
         // tracing::info!("num_rows: {}", num_rows);
-        let col_width = match self.show_type {
+        let col_width = match self.state.show_type {
             ShowType::List => 1.0,
             ShowType::Thumb => {
                 let w = ui.ctx().input(|i| i.screen_rect().size());
                 w.x / (num_cols as f32)
             }
         };
-        let row_height = match self.show_type {
+        let row_height = match self.state.show_type {
             ShowType::List => ui.text_style_height(&egui::TextStyle::Body),
             ShowType::Thumb => THUMB_LIST_HEIGHT,
         };
@@ -296,15 +94,15 @@ impl App {
             // .hscroll(self.show_type == ShowType::List)
             .id_source("content_scroll");
 
-        if self.scroll_top {
-            self.scroll_top = false;
+        if self.state.scroll_top {
+            self.state.scroll_top = false;
             scroller = scroller.scroll_offset(egui::Vec2::ZERO);
         }
 
         let (current_scroll, max_scroll) = scroller
             .show_rows(ui, row_height, num_rows, |ui, row_range| {
                 // tracing::info!("row_range: {:?}", row_range);
-                match self.show_type {
+                match self.state.show_type {
                     ShowType::List => self.render_list(ui, row_range),
                     ShowType::Thumb => self.render_thumb(ui, row_range, num_cols, col_width),
                 }
@@ -321,21 +119,25 @@ impl App {
         //     max_scroll
         // );
 
-        if self.next_query.is_some() && current_scroll >= max_scroll && !self.loading_more {
-            self.loading_more = true;
-            self.load_more(ui.ctx());
+        if self.state.next_query.is_some()
+            && current_scroll >= max_scroll
+            && !self.state.loading_more
+        {
+            self.state.loading_more = true;
+            self.state.load_more(ui.ctx());
         }
     }
 
     fn handle_click(&mut self, data: &OssObject, ui: &mut egui::Ui) {
         match data.obj_type {
             OssObjectType::File => {
-                self.current_img = data.clone();
-                self.is_preview = true;
+                self.state.current_img = data.clone();
+                self.state.is_preview = true;
                 ui.ctx().request_repaint();
             }
             OssObjectType::Folder => {
-                self.update_tx
+                self.state
+                    .update_tx
                     .send(Update::Navgator(NavgatorType::New(data.path.clone())))
                     .unwrap();
             }
@@ -344,7 +146,7 @@ impl App {
 
     fn render_list(&mut self, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
         for i in row_range {
-            if let Some(data) = self.list.get(i) {
+            if let Some(data) = self.state.list.get(i) {
                 let data = data.clone();
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                     egui::Frame::none().show(ui, |ui| {
@@ -402,9 +204,9 @@ impl App {
             .show(ui, |ui| {
                 for i in row_range {
                     for j in 0..num_cols {
-                        if let Some(d) = self.list.get(j + i * num_cols) {
-                            let url = self.get_oss_url(&d.path);
-                            let resp = item_ui(ui, d.clone(), url.clone(), &mut self.images);
+                        if let Some(d) = self.state.list.get(j + i * num_cols) {
+                            let url = self.state.get_oss_url(&d.path);
+                            let resp = item_ui(ui, d.clone(), url.clone(), &mut self.state.images);
                             if resp.on_hover_text(d.name()).clicked() {
                                 self.handle_click(&d.clone(), ui);
                             }
@@ -416,17 +218,18 @@ impl App {
     }
 
     fn bar_contents(&mut self, ui: &mut egui::Ui) {
-        ui.add_enabled_ui(self.navigator.can_go_back(), |ui| {
+        ui.add_enabled_ui(self.state.navigator.can_go_back(), |ui| {
             if ui.button("\u{2b05}").on_hover_text("Back").clicked() {
-                self.update_tx
+                self.state
+                    .update_tx
                     .send(Update::Navgator(NavgatorType::Back))
                     .unwrap();
             }
         });
-        ui.add_enabled_ui(!self.navigator.location().is_empty(), |ui| {
+        ui.add_enabled_ui(!self.state.navigator.location().is_empty(), |ui| {
             if ui.button("\u{2b06}").on_hover_text("Go Parent").clicked() {
                 let mut parent = String::from("");
-                let mut current = self.navigator.location();
+                let mut current = self.state.navigator.location();
                 if current.ends_with('/') {
                     current.pop();
                 }
@@ -434,14 +237,16 @@ impl App {
                     current.truncate(index);
                     parent = current;
                 }
-                self.update_tx
+                self.state
+                    .update_tx
                     .send(Update::Navgator(NavgatorType::New(parent)))
                     .unwrap();
             }
         });
-        ui.add_enabled_ui(self.navigator.can_go_forward(), |ui| {
+        ui.add_enabled_ui(self.state.navigator.can_go_forward(), |ui| {
             if ui.button("\u{27a1}").on_hover_text("Forward").clicked() {
-                self.update_tx
+                self.state
+                    .update_tx
                     .send(Update::Navgator(NavgatorType::Forward))
                     .unwrap();
             }
@@ -456,18 +261,18 @@ impl App {
                 .add_filter("image", &SUPPORT_EXTENSIONS)
                 .pick_files()
             {
-                self.picked_path = paths;
+                self.state.picked_path = paths;
             }
         }
         ui.horizontal(|ui| {
             ui.set_width(25.0);
-            let enabled = self.state != State::Busy(Route::List)
-                && self.state != State::Busy(Route::Upload)
-                && !self.loading_more;
+            let enabled = self.state.status != Status::Busy(Route::List)
+                && self.state.status != Status::Busy(Route::Upload)
+                && !self.state.loading_more;
 
             ui.add_enabled_ui(enabled, |ui| {
                 if ui.button("\u{1f503}").clicked() {
-                    self.refresh(ui.ctx());
+                    self.state.refresh(ui.ctx());
                 }
             });
         });
@@ -482,16 +287,16 @@ impl App {
                 ui.style_mut().visuals.button_frame = false;
                 ui.style_mut().visuals.widgets.active.rounding = egui::Rounding::same(2.0);
                 if ui
-                    .selectable_value(&mut self.show_type, ShowType::Thumb, "\u{25a3}")
+                    .selectable_value(&mut self.state.show_type, ShowType::Thumb, "\u{25a3}")
                     .clicked()
                 {
-                    self.scroll_top = true;
+                    self.state.scroll_top = true;
                 }
                 if ui
-                    .selectable_value(&mut self.show_type, ShowType::List, "\u{2630}")
+                    .selectable_value(&mut self.state.show_type, ShowType::List, "\u{2630}")
                     .clicked()
                 {
-                    self.scroll_top = true;
+                    self.state.scroll_top = true;
                 }
             });
             self.location_bar(ui);
@@ -501,13 +306,14 @@ impl App {
     fn location_bar(&mut self, ui: &mut egui::Ui) {
         let response = ui.add_sized(
             ui.available_size(),
-            egui::TextEdit::singleline(&mut self.current_path),
+            egui::TextEdit::singleline(&mut self.state.current_path),
         );
         if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-            if self.current_path != self.navigator.location() {
-                self.update_tx
+            if self.state.current_path != self.state.navigator.location() {
+                self.state
+                    .update_tx
                     .send(Update::Navgator(NavgatorType::New(
-                        self.current_path.clone(),
+                        self.state.current_path.clone(),
                     )))
                     .unwrap();
             }
@@ -517,19 +323,19 @@ impl App {
     fn status_bar_contents(&mut self, ui: &mut egui::Ui) {
         egui::widgets::global_dark_light_mode_switch(ui);
 
-        if self.loading_more {
+        if self.state.loading_more {
             ui.add(egui::Spinner::new().size(12.0));
         }
 
-        ui.label(format!("Count: {}", self.list.len()));
+        ui.label(format!("Count: {}", self.state.list.len()));
 
-        if self.next_query.is_none() && !self.loading_more {
+        if self.state.next_query.is_none() && !self.state.loading_more {
             // ui.label("No More Data.");
         }
 
-        match &mut self.state {
-            State::Idle(_) => (),
-            State::Busy(route) => match route {
+        match &mut self.state.status {
+            Status::Idle(_) => (),
+            Status::Busy(route) => match route {
                 Route::Upload => {
                     ui.label("Uploading file...");
                 }
@@ -541,7 +347,7 @@ impl App {
         }
 
         let style = &ui.style().visuals;
-        let color = if self.is_show_result {
+        let color = if self.state.is_show_result {
             style.hyperlink_color
         } else {
             style.text_color()
@@ -549,128 +355,24 @@ impl App {
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
             if ui.button("\u{1f464}").on_hover_text("Logout").clicked() {
-                self.confirm
-                    .show("Do you confirm to logout?", ConfirmAction::Logout);
+                self.state
+                    .confirm("Do you confirm to logout?", ConfirmAction::Logout);
             }
             if ui
                 .button(egui::RichText::new("\u{1f4ac}").color(color))
                 .clicked()
             {
-                self.is_show_result = !self.is_show_result;
+                self.state.is_show_result = !self.state.is_show_result;
             }
         });
-    }
-
-    fn show_image(&mut self, ctx: &egui::Context) {
-        let url = self.get_oss_url(&self.current_img.path);
-
-        if url.is_empty() {
-            return;
-        }
-
-        if self.is_preview {
-            egui::Area::new("preview_area")
-                // .order(egui::Order::Foreground)
-                // .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .fixed_pos(egui::Pos2::ZERO)
-                .show(ctx, |ui| {
-                    let screen_rect = ui.ctx().input(|i| i.screen_rect);
-                    let area_response =
-                        ui.allocate_response(screen_rect.size(), egui::Sense::click());
-                    if area_response.clicked() {
-                        self.is_preview = false;
-                    }
-                    ui.painter().rect_filled(
-                        screen_rect,
-                        egui::Rounding::none(),
-                        egui::Color32::from_rgba_premultiplied(0, 0, 0, 200),
-                    );
-                    let win_size = screen_rect.size();
-                    let response = egui::Window::new("")
-                        .id(egui::Id::new("preview_win"))
-                        .open(&mut self.is_preview)
-                        .title_bar(false)
-                        .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
-                        .resizable(false)
-                        .show(&ctx, |ui| {
-                            egui::ScrollArea::vertical()
-                                .auto_shrink([false; 2])
-                                .max_height(win_size.y - 100.0)
-                                .show(ui, |ui| {
-                                    if let Some(img) = self.images.get(&url) {
-                                        let mut size = img.size_vec2();
-                                        size *= (ui.available_width() / size.x).min(1.0);
-                                        img.show_size(ui, size);
-                                    }
-                                });
-                            ui.vertical_centered_justified(|ui| {
-                                let mut url = url;
-                                let resp = ui.add(egui::TextEdit::singleline(&mut url));
-                                if resp.on_hover_text("Click to copy").clicked() {
-                                    ui.output_mut(|o| o.copied_text = url);
-                                }
-                                ui.horizontal(|ui| {
-                                    ui.label(format!("size: {}", self.current_img.size));
-                                    ui.label(&self.current_img.last_modified);
-                                });
-                            });
-                        });
-                    if let Some(inner_response) = response {
-                        inner_response.response.request_focus();
-                        ctx.move_to_top(inner_response.response.layer_id);
-                    }
-                });
-        }
-    }
-    fn show_result(&mut self, ctx: &egui::Context) {
-        if self.is_show_result {
-            egui::Area::new("result")
-                .order(egui::Order::Foreground)
-                .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    egui::Frame::none()
-                        .fill(ui.style().visuals.extreme_bg_color)
-                        .inner_margin(ui.style().spacing.window_margin)
-                        .show(ui, |ui| {
-                            ui.set_width(400.0);
-                            ui.heading("Result");
-                            ui.spacing();
-                            for path in &self.upload_result {
-                                match path {
-                                    UploadResult::Success(str) => ui.label(
-                                        egui::RichText::new(format!("\u{2714} {str}"))
-                                            .color(egui::Color32::GREEN),
-                                    ),
-                                    UploadResult::Error(str) => ui.label(
-                                        egui::RichText::new(format!("\u{2716} {str}"))
-                                            .color(egui::Color32::RED),
-                                    ),
-                                };
-                            }
-                        });
-                });
-        }
-    }
-
-    fn init_confirm(&mut self, ctx: &egui::Context) {
-        self.confirm.init(ctx);
-        while let Ok(action) = self.confirm_rx.try_recv() {
-            match action {
-                ConfirmAction::Logout => {
-                    self.state = State::Idle(Route::Auth);
-                    self.oss = None;
-                    self.current_path = String::from("");
-                    self.navigator.clear();
-                }
-            }
-        }
     }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        match &mut self.state {
-            State::Idle(ref mut route) => match route {
+        self.state.init(ctx);
+        match &mut self.state.status {
+            Status::Idle(ref mut route) => match route {
                 Route::Auth => {
                     egui::CentralPanel::default().show(ctx, |ui| self.render_auth(ui));
                     return;
@@ -679,54 +381,6 @@ impl eframe::App for App {
             },
             _ => {}
         };
-        self.images.poll();
-        self.init_confirm(ctx);
-        while let Ok(update) = self.update_rx.try_recv() {
-            match update {
-                Update::Uploaded(result) => match result {
-                    Ok(str) => {
-                        self.state = State::Idle(Route::List);
-                        self.upload_result = str;
-                        self.is_show_result = true;
-                    }
-                    Err(err) => {
-                        self.state = State::Idle(Route::Upload);
-                        self.err = Some(err.message());
-                    }
-                },
-                Update::List(result) => match result {
-                    Ok(str) => {
-                        self.next_query = str.next_query();
-                        self.set_list(str);
-                        self.loading_more = false;
-                        self.state = State::Idle(Route::List);
-                    }
-                    Err(err) => {
-                        self.state = State::Idle(Route::List);
-                        self.err = Some(err.message());
-                    }
-                },
-                Update::Navgator(nav) => {
-                    match nav {
-                        NavgatorType::Back => {
-                            if self.navigator.can_go_back() {
-                                self.navigator.go(-1);
-                            }
-                        }
-                        NavgatorType::Forward => {
-                            if self.navigator.can_go_forward() {
-                                self.navigator.go(1);
-                            }
-                        }
-                        NavgatorType::New(path) => {
-                            self.navigator.push(path);
-                        }
-                    }
-                    self.current_path = self.navigator.location();
-                    self.refresh(ctx);
-                }
-            }
-        }
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             egui::Frame::none()
@@ -749,13 +403,13 @@ impl eframe::App for App {
             egui::Frame::none()
                 .inner_margin(egui::style::Margin::same(0.0))
                 .show(ui, |ui| {
-                    match &mut self.state {
-                        State::Idle(ref mut route) => match route {
+                    match &mut self.state.status {
+                        Status::Idle(ref mut route) => match route {
                             Route::Upload => {}
                             Route::List => self.render_content(ui),
                             _ => {}
                         },
-                        State::Busy(_) => {
+                        Status::Busy(_) => {
                             ui.centered_and_justified(|ui| {
                                 ui.spinner();
                             });
@@ -763,43 +417,5 @@ impl eframe::App for App {
                     };
                 });
         });
-
-        if self.oss.is_some() {
-            self.show_image(ctx);
-            self.show_result(ctx);
-        }
-
-        if !self.dropped_files.is_empty() {
-            let mut files = vec![];
-            let dropped_files = self.dropped_files.clone();
-            self.dropped_files = vec![];
-            for file in dropped_files {
-                if let Some(path) = &file.path {
-                    if SUPPORT_EXTENSIONS.contains(&get_extension(path.clone()).as_str()) {
-                        files.push(path.clone());
-                    }
-                }
-            }
-
-            self.picked_path = files;
-        }
-
-        self.upload_file(ctx);
-
-        if !ctx.input(|i| i.raw.dropped_files.is_empty()) {
-            self.dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
-        }
     }
-}
-
-fn build_query(path: String) -> Query {
-    let mut path = path.clone();
-    if !path.ends_with('/') && !path.is_empty() {
-        path.push_str("/");
-    }
-    let mut query = Query::new();
-    query.insert("prefix", path);
-    query.insert("delimiter", "/");
-    query.insert("max-keys", "40");
-    query
 }

@@ -5,6 +5,7 @@ mod object;
 mod oss;
 pub mod runtime;
 mod session;
+mod setting;
 pub mod store;
 pub mod util;
 pub use aliyun_oss_client::{
@@ -18,6 +19,7 @@ pub use image_cache::{ImageCache, ImageFetcher};
 pub use object::{OssBucket, OssObject, OssObjectType};
 pub use oss::{OssClient, UploadResult};
 pub use session::Session;
+pub use setting::Setting;
 pub use tokio;
 pub use tracing;
 
