@@ -1,8 +1,10 @@
+use cc_core::Session;
 use egui_modal::{Icon, Modal};
 
 #[derive(Clone)]
 pub enum ConfirmAction {
     Logout,
+    RemoveSession(Session),
 }
 
 pub struct Confirm {

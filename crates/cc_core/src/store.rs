@@ -18,16 +18,43 @@ pub fn get_local_config<T: DeserializeOwned>(name: &str) -> Option<T> {
 }
 
 pub fn get_latest_session() -> Option<Session> {
-    let session_raw = std::fs::read(STORE.latest_session_file()).ok()?;
+    get_session_by_path(STORE.latest_session_file())
+}
+
+pub fn get_session_by_path(path: &Path) -> Option<Session> {
+    let session_raw = std::fs::read(path).ok()?;
     let session = serde_json::from_slice::<Session>(&session_raw)
         .map_err(|err| CoreError::Custom(err.to_string()))
         .ok()?;
     Some(session)
 }
 
-pub fn put_session(session: Session) {
-    let serialized = serde_json::to_string_pretty(&session).expect("failed to serialize");
-    let _ = std::fs::write(STORE.latest_session_file(), serialized.into_bytes());
+pub fn get_all_session() -> Result<Vec<Session>, CoreError> {
+    let mut sessions = vec![];
+    for entry in std::fs::read_dir(STORE.sessions_dir())? {
+        let entry = entry?;
+        if entry.file_name() != std::ffi::OsString::from("latest") {
+            let path = entry.path();
+            if let Some(session) = get_session_by_path(path.as_path()) {
+                sessions.push(session);
+            }
+        }
+    }
+    Ok(sessions)
+}
+
+pub fn put_session(session: &Session) -> Result<(), CoreError> {
+    let serialized = serde_json::to_string_pretty(session).expect("failed to serialize");
+    let src = STORE.sessions_dir().join(&session.key_id);
+    // let _ = std::fs::write(STORE.latest_session_file(), serialized.clone().into_bytes());
+    let _ = std::fs::write(&src, serialized.into_bytes());
+    std::fs::copy(src, STORE.latest_session_file())?;
+    Ok(())
+}
+
+pub fn delete_session_by_name(name: String) {
+    let path = STORE.sessions_dir().join(&name);
+    let _ = std::fs::remove_file(path.as_path());
 }
 
 pub fn delete_latest_session() {

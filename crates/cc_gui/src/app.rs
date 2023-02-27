@@ -1,18 +1,25 @@
 use crate::state::{NavgatorType, Route, ShowType, State, Status, Update};
 use crate::theme::text_ellipsis;
-use crate::widgets::{confirm::ConfirmAction, item_ui, password};
+use crate::widgets::{auth_history_table, confirm::ConfirmAction, item_ui, password};
 use crate::{SUPPORT_EXTENSIONS, THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use cc_core::{OssObject, OssObjectType};
 use chrono::DateTime;
+use egui_notify::Toasts;
+
+const SAVE_NOTIF_DURATION: Option<std::time::Duration> = Some(std::time::Duration::from_secs(4));
 
 pub struct App {
     state: State,
+    toasts: Toasts,
 }
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let state = State::new(&cc.egui_ctx);
-        let mut this = Self { state };
+        let mut this = Self {
+            state,
+            toasts: Toasts::new(),
+        };
 
         if this.state.oss.is_some() {
             this.state.get_list(&cc.egui_ctx);
@@ -25,7 +32,7 @@ impl App {
         egui::Frame::none()
             // .inner_margin(egui::style::Margin::same(0.0))
             .show(ui, |ui| {
-                egui::Grid::new("auth_grid")
+                egui::Grid::new("auth_form_grid")
                     .spacing([10.0; 2])
                     .num_columns(2)
                     .show(ui, |ui| {
@@ -47,8 +54,25 @@ impl App {
 
                 ui.add_space(20.0);
                 if ui.button("Save").clicked() {
-                    self.state.save_auth(ui.ctx());
+                    match self.state.save_auth(ui.ctx()) {
+                        Ok(_) => {
+                            self.toasts
+                                .success("Success")
+                                .set_duration(SAVE_NOTIF_DURATION);
+                        }
+                        Err(err) => {
+                            self.toasts
+                                .error(err.to_string())
+                                .set_duration(SAVE_NOTIF_DURATION);
+                        }
+                    }
                 }
+
+                ui.separator();
+
+                ui.heading("History");
+
+                auth_history_table(ui, &mut self.state);
             });
     }
 
@@ -417,5 +441,7 @@ impl eframe::App for App {
                     };
                 });
         });
+
+        self.toasts.show(ctx);
     }
 }

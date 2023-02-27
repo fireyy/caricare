@@ -1,8 +1,8 @@
 use crate::widgets::confirm::{Confirm, ConfirmAction};
 use crate::SUPPORT_EXTENSIONS;
 use cc_core::{
-    store, tokio, tracing, util::get_extension, ImageCache, ImageFetcher, MemoryHistory, OssBucket,
-    OssClient, OssError, OssObject, Query, Session, Setting, UploadResult,
+    store, tokio, tracing, util::get_extension, CoreError, ImageCache, ImageFetcher, MemoryHistory,
+    OssBucket, OssClient, OssError, OssObject, Query, Session, Setting, UploadResult,
 };
 use egui_modal::{Modal, ModalStyle};
 use std::{path::PathBuf, sync::mpsc, vec};
@@ -58,6 +58,7 @@ pub struct State {
     pub navigator: MemoryHistory,
     pub confirm: Confirm,
     pub session: Session,
+    pub sessions: Vec<Session>,
     pub err: Option<String>,
     pub dropped_files: Vec<egui::DroppedFile>,
     pub picked_path: Vec<PathBuf>,
@@ -70,6 +71,13 @@ impl State {
             Some(session) => session,
             None => Session::default(),
         };
+        let mut sessions = vec![];
+        match store::get_all_session() {
+            Ok(list) => {
+                sessions = list;
+            }
+            Err(err) => tracing::debug!("{:?}", err),
+        }
         let mut oss = None;
 
         let (update_tx, update_rx) = mpsc::sync_channel(1);
@@ -117,6 +125,7 @@ impl State {
             navigator,
             confirm: Confirm::new(confirm_tx),
             session,
+            sessions,
             dropped_files: vec![],
             picked_path: vec![],
             status,
@@ -279,18 +288,15 @@ impl State {
         self.get_list(ctx);
     }
 
-    pub fn save_auth(&mut self, ctx: &egui::Context) {
-        match OssClient::new(&self.session) {
-            Ok(client) => {
-                store::put_session(self.session.clone());
-                let current_path = client.get_path().to_string();
-                self.current_path = current_path.clone();
-                self.navigator.push(current_path);
-                self.oss = Some(client);
-                self.refresh(ctx);
-            }
-            Err(err) => tracing::error!("{:?}", err),
-        }
+    pub fn save_auth(&mut self, ctx: &egui::Context) -> Result<(), CoreError> {
+        let client = OssClient::new(&self.session)?;
+        let _ = store::put_session(&self.session)?;
+        let current_path = client.get_path().to_string();
+        self.current_path = current_path.clone();
+        self.navigator.push(current_path);
+        self.oss = Some(client);
+        self.refresh(ctx);
+        Ok(())
     }
 
     pub fn init_confirm(&mut self, ctx: &egui::Context) {
@@ -302,6 +308,9 @@ impl State {
                     self.oss = None;
                     self.current_path = String::from("");
                     self.navigator.clear();
+                }
+                ConfirmAction::RemoveSession(session) => {
+                    store::delete_session_by_name(session.key_id);
                 }
             }
         }

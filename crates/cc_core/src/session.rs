@@ -1,4 +1,5 @@
 use crate::error::CoreError;
+use crate::regex;
 use aliyun_oss_client::config::Config;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
@@ -45,5 +46,14 @@ impl Session {
             self.endpoint.clone(),
             self.bucket.clone(),
         )?)
+    }
+
+    pub fn key_secret_mask(&self) -> String {
+        regex!(r"(?P<prefix>\w{3})(?P<replace_value>\w*)(?P<suffix>\w{3})")
+            .replace_all(
+                &self.key_secret,
+                format!("{}{}{}", "$prefix", "****", "$suffix"),
+            )
+            .to_string()
     }
 }

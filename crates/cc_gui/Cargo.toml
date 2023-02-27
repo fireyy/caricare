@@ -7,8 +7,10 @@ edition = "2021"
 
 [dependencies]
 cc_core = { workspace = true }
-eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
+eframe = { workspace = true }
 egui = "0.21.0"
+egui_extras = "0.21.0"
 rfd = "0.10"
 chrono = "0.4"
 egui-modal = "0.2.1"
+egui-notify = "0.6"

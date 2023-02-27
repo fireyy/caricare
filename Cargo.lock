@@ -570,6 +570,8 @@ dependencies = [
  "eframe",
  "egui",
  "egui-modal",
+ "egui-notify",
+ "egui_extras",
  "rfd",
 ]
 
@@ -992,6 +994,15 @@ name = "egui-modal"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa11914b870c1378e83385171fc54642134e98b46196f2dd7cc24a142f2641f5"
+dependencies = [
+ "egui",
+]
+
+[[package]]
+name = "egui-notify"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa87d2d91ebea916ae30837068f869f9b91242107f86f6abc3f085fbd160e195"
 dependencies = [
  "egui",
 ]
