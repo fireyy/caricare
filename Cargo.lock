@@ -517,7 +517,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "caricare_native"
+name = "caricare"
 version = "0.1.0"
 dependencies = [
  "cc_core",

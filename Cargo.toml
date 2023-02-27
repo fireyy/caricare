@@ -1,8 +1,28 @@
+[package]
+name = "caricare"
+version = "0.1.0"
+edition = "2021"
+description = "An Alibaba Cloud Object Storage Service (OSS) browser GUI for Rust."
+
+[package.metadata.bundle]
+name = "Caricare"
+identifier = "com.fireyy.caricare"
+icon = ["icons/Icon.icns", "icons/Icon.iconset/icon-256.png", "icons/Icon.iconset/icon-32.png", "icons/Icon.iconset/icon-16.png"]
+version = "1.0.0"
+copyright = "Copyright (c) Fireyy (2021). All rights reserved."
+category = "Developer Tool"
+short_description = "An Alibaba Cloud Object Storage Service (OSS) browser GUI for Rust"
+osx_minimum_system_version = "10.12"
+
+[dependencies]
+cc_core = { workspace = true }
+cc_gui = { workspace = true }
+eframe = { workspace = true }
+
 [workspace]
 resolver = "2"
 members = [
     "crates/*",
-    "caricare_native",
 ]
 
 [workspace.package]
