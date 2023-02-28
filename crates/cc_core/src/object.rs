@@ -14,14 +14,14 @@ fn get_name_form_path(path: &str) -> String {
         .to_string()
 }
 
-#[derive(Clone, Default, Debug, PartialEq)]
+#[derive(Clone, Default, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum OssObjectType {
     #[default]
     File,
     Folder,
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, serde::Deserialize, serde::Serialize)]
 pub struct OssObject {
     pub obj_type: OssObjectType,
     pub path: String,

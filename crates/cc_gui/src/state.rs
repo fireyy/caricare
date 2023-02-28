@@ -7,22 +7,23 @@ use cc_core::{
 use egui_modal::{Modal, ModalStyle};
 use std::{path::PathBuf, sync::mpsc, vec};
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum ShowType {
-    List,
-    Thumb,
-}
-
 #[derive(PartialEq)]
 pub enum Status {
     Idle(Route),
     Busy(Route),
 }
 
-#[derive(Clone, Copy, PartialEq)]
+impl Default for Status {
+    fn default() -> Self {
+        Self::Idle(Route::default())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Default)]
 pub enum Route {
     Upload,
     List,
+    #[default]
     Auth,
 }
 
@@ -38,30 +39,42 @@ pub enum Update {
     Navgator(NavgatorType),
 }
 
+#[derive(serde::Serialize)]
+#[serde(default)]
 pub struct State {
+    #[serde(skip)]
     pub oss: Option<OssClient>,
     pub list: Vec<OssObject>,
     pub current_img: OssObject,
+    #[serde(skip)]
     pub update_tx: mpsc::SyncSender<Update>,
+    #[serde(skip)]
     pub update_rx: mpsc::Receiver<Update>,
+    #[serde(skip)]
     pub confirm_rx: mpsc::Receiver<ConfirmAction>,
     pub setting: Setting,
-    pub show_type: ShowType,
     pub is_preview: bool,
     pub loading_more: bool,
+    #[serde(skip)]
     pub next_query: Option<Query>,
     pub scroll_top: bool,
+    #[serde(skip)]
     pub images: ImageCache,
+    #[serde(skip)]
     pub upload_result: Vec<UploadResult>,
     pub is_show_result: bool,
     pub current_path: String,
     pub navigator: MemoryHistory,
+    #[serde(skip)]
     pub confirm: Confirm,
     pub session: Session,
     pub sessions: Vec<Session>,
     pub err: Option<String>,
+    #[serde(skip)]
     pub dropped_files: Vec<egui::DroppedFile>,
+    #[serde(skip)]
     pub picked_path: Vec<PathBuf>,
+    #[serde(skip)]
     pub status: Status,
 }
 
@@ -90,7 +103,10 @@ impl State {
 
         let mut status = Status::Idle(Route::List);
 
-        if !session.is_empty() {
+        let setting = Setting::load();
+        let limit = setting.page_limit;
+
+        if !session.is_empty() && setting.auto_login {
             match OssClient::new(&session) {
                 Ok(client) => {
                     current_path = client.get_path().to_string();
@@ -102,11 +118,9 @@ impl State {
         } else {
             status = Status::Idle(Route::Auth);
         }
-        let setting = Setting::load();
 
         Self {
             setting,
-            show_type: ShowType::List,
             oss,
             current_img: OssObject::default(),
             list: vec![],
@@ -116,7 +130,7 @@ impl State {
             err: None,
             is_preview: false,
             loading_more: false,
-            next_query: Some(build_query(current_path.clone())),
+            next_query: Some(build_query(current_path.clone(), limit)),
             scroll_top: false,
             images,
             upload_result: vec![],
@@ -283,7 +297,7 @@ impl State {
         self.err = None;
         self.scroll_top = true;
         let current_path = self.navigator.location();
-        self.next_query = Some(build_query(current_path));
+        self.next_query = Some(build_query(current_path, self.setting.page_limit));
         self.list = vec![];
         self.get_list(ctx);
     }
@@ -296,6 +310,7 @@ impl State {
         self.navigator.push(current_path);
         self.oss = Some(client);
         self.refresh(ctx);
+        self.setting.auto_login = false;
         Ok(())
     }
 
@@ -308,6 +323,7 @@ impl State {
                     self.oss = None;
                     self.current_path = String::from("");
                     self.navigator.clear();
+                    self.setting.auto_login = false;
                 }
                 ConfirmAction::RemoveSession(session) => {
                     store::delete_session_by_name(session.key_id);
@@ -403,7 +419,7 @@ impl State {
     }
 }
 
-fn build_query(path: String) -> Query {
+fn build_query(path: String, limit: u16) -> Query {
     let mut path = path.clone();
     if !path.ends_with('/') && !path.is_empty() {
         path.push_str("/");
@@ -411,6 +427,6 @@ fn build_query(path: String) -> Query {
     let mut query = Query::new();
     query.insert("prefix", path);
     query.insert("delimiter", "/");
-    query.insert("max-keys", "40");
+    query.insert("max-keys", limit);
     query
 }

@@ -6,7 +6,7 @@ use std::fmt;
 use std::rc::Rc;
 
 /// A History Stack.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 struct LocationStack {
     prev: Vec<String>,
     next: VecDeque<String>,
@@ -71,7 +71,7 @@ impl LocationStack {
 }
 
 /// A [`History`] that is implemented with in memory history stack and is usable in most targets.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct MemoryHistory {
     inner: Rc<RefCell<LocationStack>>,
 }

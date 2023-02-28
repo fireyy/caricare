@@ -19,7 +19,7 @@ pub use image_cache::{ImageCache, ImageFetcher};
 pub use object::{OssBucket, OssObject, OssObjectType};
 pub use oss::{OssClient, UploadResult};
 pub use session::Session;
-pub use setting::Setting;
+pub use setting::{Setting, ShowType};
 pub use tokio;
 pub use tracing;
 

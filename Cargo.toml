@@ -36,6 +36,7 @@ version = "0.1.0"
 cc_core = { path = "crates/cc_core" }
 cc_gui = { path = "crates/cc_gui" }
 eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
+serde = { version = "1", features = ["derive"] }
 
 [profile.dev]
 opt-level = 1 # Make debug builds run faster

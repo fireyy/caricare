@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 cc_core = { workspace = true }
 eframe = { workspace = true }
+serde = { workspace = true }
 egui = "0.21.0"
 egui_extras = "0.21.0"
 rfd = "0.10"

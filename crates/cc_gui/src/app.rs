@@ -1,8 +1,8 @@
-use crate::state::{NavgatorType, Route, ShowType, State, Status, Update};
+use crate::state::{NavgatorType, Route, State, Status, Update};
 use crate::theme::text_ellipsis;
 use crate::widgets::{auth_history_table, confirm::ConfirmAction, item_ui, password};
 use crate::{SUPPORT_EXTENSIONS, THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
-use cc_core::{OssObject, OssObjectType};
+use cc_core::{OssObject, OssObjectType, ShowType};
 use chrono::DateTime;
 use egui_notify::Toasts;
 
@@ -87,26 +87,26 @@ impl App {
             ui.centered_and_justified(|ui| ui.heading("Nothing Here."));
             return;
         }
-        let num_cols = match self.state.show_type {
+        let num_cols = match self.state.setting.show_type {
             ShowType::List => 1,
             ShowType::Thumb => {
                 let w = ui.ctx().input(|i| i.screen_rect().size());
                 (w.x / THUMB_LIST_WIDTH) as usize
             }
         };
-        let num_rows = match self.state.show_type {
+        let num_rows = match self.state.setting.show_type {
             ShowType::List => self.state.list.len(),
             ShowType::Thumb => (self.state.list.len() as f32 / num_cols as f32).ceil() as usize,
         };
         // tracing::info!("num_rows: {}", num_rows);
-        let col_width = match self.state.show_type {
+        let col_width = match self.state.setting.show_type {
             ShowType::List => 1.0,
             ShowType::Thumb => {
                 let w = ui.ctx().input(|i| i.screen_rect().size());
                 w.x / (num_cols as f32)
             }
         };
-        let row_height = match self.state.show_type {
+        let row_height = match self.state.setting.show_type {
             ShowType::List => ui.text_style_height(&egui::TextStyle::Body),
             ShowType::Thumb => THUMB_LIST_HEIGHT,
         };
@@ -126,7 +126,7 @@ impl App {
         let (current_scroll, max_scroll) = scroller
             .show_rows(ui, row_height, num_rows, |ui, row_range| {
                 // tracing::info!("row_range: {:?}", row_range);
-                match self.state.show_type {
+                match self.state.setting.show_type {
                     ShowType::List => self.render_list(ui, row_range),
                     ShowType::Thumb => self.render_thumb(ui, row_range, num_cols, col_width),
                 }
@@ -311,13 +311,21 @@ impl App {
                 ui.style_mut().visuals.button_frame = false;
                 ui.style_mut().visuals.widgets.active.rounding = egui::Rounding::same(2.0);
                 if ui
-                    .selectable_value(&mut self.state.show_type, ShowType::Thumb, "\u{25a3}")
+                    .selectable_value(
+                        &mut self.state.setting.show_type,
+                        ShowType::Thumb,
+                        "\u{25a3}",
+                    )
                     .clicked()
                 {
                     self.state.scroll_top = true;
                 }
                 if ui
-                    .selectable_value(&mut self.state.show_type, ShowType::List, "\u{2630}")
+                    .selectable_value(
+                        &mut self.state.setting.show_type,
+                        ShowType::List,
+                        "\u{2630}",
+                    )
                     .clicked()
                 {
                     self.state.scroll_top = true;
@@ -393,6 +401,10 @@ impl App {
 }
 
 impl eframe::App for App {
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
+        self.state.setting.store();
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.state.init(ctx);
         match &mut self.state.status {
