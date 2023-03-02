@@ -1,4 +1,5 @@
 mod app;
+mod pages;
 mod state;
 mod theme;
 mod widgets;

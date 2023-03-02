@@ -1,10 +1,13 @@
-use crate::widgets::confirm::{Confirm, ConfirmAction};
+use crate::widgets::{
+    confirm::{Confirm, ConfirmAction},
+    image_view_ui, result_view_ui,
+};
 use crate::SUPPORT_EXTENSIONS;
 use cc_core::{
     store, tokio, tracing, util::get_extension, CoreError, ImageCache, ImageFetcher, MemoryHistory,
     OssBucket, OssClient, OssError, OssObject, Query, Session, Setting, UploadResult,
 };
-use egui_modal::{Modal, ModalStyle};
+use egui_notify::Toasts;
 use std::{path::PathBuf, sync::mpsc, vec};
 
 #[derive(PartialEq)]
@@ -76,6 +79,8 @@ pub struct State {
     pub picked_path: Vec<PathBuf>,
     #[serde(skip)]
     pub status: Status,
+    #[serde(skip)]
+    pub toasts: Toasts,
 }
 
 impl State {
@@ -143,6 +148,7 @@ impl State {
             dropped_files: vec![],
             picked_path: vec![],
             status,
+            toasts: Toasts::new(),
         }
     }
 
@@ -218,9 +224,11 @@ impl State {
         }
 
         if self.oss.is_some() {
-            self.show_image(ctx);
-            self.show_result(ctx);
+            image_view_ui(ctx, self);
+            result_view_ui(ctx, self);
         }
+
+        self.toasts.show(ctx);
     }
 
     pub fn oss(&self) -> &OssClient {
@@ -326,7 +334,7 @@ impl State {
                     self.setting.auto_login = false;
                 }
                 ConfirmAction::RemoveSession(session) => {
-                    store::delete_session_by_name(session.key_id);
+                    store::delete_session_by_name(&session.key_id);
                 }
             }
         }
@@ -334,88 +342,6 @@ impl State {
 
     pub fn confirm(&mut self, message: impl Into<String>, action: ConfirmAction) {
         self.confirm.show(message, action);
-    }
-
-    fn show_image(&mut self, ctx: &egui::Context) {
-        let url = self.get_oss_url(&self.current_img.path);
-
-        if url.is_empty() {
-            return;
-        }
-
-        let win_size = ctx.input(|i| i.screen_rect).size();
-        let modal = Modal::new(ctx, "preview_area")
-            // .with_close_on_outside_click(true)
-            .with_style(&ModalStyle {
-                default_width: Some(win_size.x - 200.0),
-                ..Default::default()
-            });
-
-        modal.show(|ui| {
-            modal.title(ui, "Preview");
-            modal.frame(ui, |ui| {
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false; 2])
-                    .max_height(win_size.y - 150.0)
-                    .show(ui, |ui| {
-                        if let Some(img) = self.images.get(&url) {
-                            let mut size = img.size_vec2();
-                            size *= (ui.available_width() / size.x).min(1.0);
-                            img.show_size(ui, size);
-                        }
-                    });
-                ui.vertical_centered_justified(|ui| {
-                    let mut url = url;
-                    let resp = ui.add(egui::TextEdit::singleline(&mut url));
-                    if resp.on_hover_text("Click to copy").clicked() {
-                        ui.output_mut(|o| o.copied_text = url);
-                    }
-                    ui.horizontal(|ui| {
-                        ui.label(format!("size: {}", self.current_img.size));
-                        ui.label(&self.current_img.last_modified);
-                    });
-                });
-            });
-            modal.buttons(ui, |ui| {
-                if modal.button(ui, "close").clicked() {
-                    self.is_preview = false;
-                };
-            });
-        });
-
-        if self.is_preview {
-            modal.open();
-        }
-    }
-
-    fn show_result(&mut self, ctx: &egui::Context) {
-        if self.is_show_result {
-            egui::Area::new("result")
-                .order(egui::Order::Foreground)
-                .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    egui::Frame::none()
-                        .fill(ui.style().visuals.extreme_bg_color)
-                        .inner_margin(ui.style().spacing.window_margin)
-                        .show(ui, |ui| {
-                            ui.set_width(400.0);
-                            ui.heading("Result");
-                            ui.spacing();
-                            for path in &self.upload_result {
-                                match path {
-                                    UploadResult::Success(str) => ui.label(
-                                        egui::RichText::new(format!("\u{2714} {str}"))
-                                            .color(egui::Color32::GREEN),
-                                    ),
-                                    UploadResult::Error(str) => ui.label(
-                                        egui::RichText::new(format!("\u{2716} {str}"))
-                                            .color(egui::Color32::RED),
-                                    ),
-                                };
-                            }
-                        });
-                });
-        }
     }
 }
 

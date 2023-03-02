@@ -52,8 +52,8 @@ pub fn put_session(session: &Session) -> Result<(), CoreError> {
     Ok(())
 }
 
-pub fn delete_session_by_name(name: String) {
-    let path = STORE.sessions_dir().join(&name);
+pub fn delete_session_by_name(name: &str) {
+    let path = STORE.sessions_dir().join(name);
     let _ = std::fs::remove_file(path.as_path());
 }
 
