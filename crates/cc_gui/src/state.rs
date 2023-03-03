@@ -58,6 +58,9 @@ pub struct State {
     pub confirm_rx: mpsc::Receiver<ConfirmAction>,
     pub setting: Setting,
     pub is_preview: bool,
+    pub img_zoom: f32,
+    #[serde(skip)]
+    pub offset: egui::Vec2,
     pub loading_more: bool,
     #[serde(skip)]
     pub next_query: Option<Query>,
@@ -138,6 +141,8 @@ impl State {
             confirm_rx,
             err: None,
             is_preview: false,
+            img_zoom: 1.0,
+            offset: Default::default(),
             loading_more: false,
             next_query: Some(build_query(current_path.clone(), limit)),
             scroll_top: false,

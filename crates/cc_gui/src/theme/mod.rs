@@ -2,7 +2,6 @@ mod design_tokens;
 
 use design_tokens::DesignTokens;
 use eframe::epaint::text::{LayoutJob, TextWrapping};
-use egui::Color32;
 
 pub const FULLSIZE_CONTENT: bool = cfg!(target_os = "macos");
 pub const CUSTOM_WINDOW_DECORATIONS: bool = false;
