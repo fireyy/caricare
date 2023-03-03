@@ -156,8 +156,8 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
         bottom_bar_color: Color32::from_rgb(20, 24, 25),
         bottom_bar_stroke: egui::Stroke::new(1.0, egui::Color32::from_gray(47)), // copied from figma
         bottom_bar_rounding: egui::Rounding {
-            nw: 6.0,
-            ne: 6.0,
+            nw: super::CCUi::normal_rounding(),
+            ne: super::CCUi::normal_rounding(),
             sw: 0.0,
             se: 0.0,
         }, // copied from figma, should be top only

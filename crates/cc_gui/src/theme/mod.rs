@@ -6,22 +6,6 @@ use eframe::epaint::text::{LayoutJob, TextWrapping};
 pub const FULLSIZE_CONTENT: bool = cfg!(target_os = "macos");
 pub const CUSTOM_WINDOW_DECORATIONS: bool = false;
 
-pub fn text_ellipsis(ui: &egui::Ui, name: &str, max_rows: usize) -> LayoutJob {
-    let font_id = egui::TextStyle::Body.resolve(ui.style());
-    let color = ui.style().visuals.text_color();
-    let mut job =
-        LayoutJob::single_section(name.to_string(), egui::TextFormat::simple(font_id, color));
-
-    job.wrap = TextWrapping {
-        max_rows,
-        break_anywhere: true,
-        overflow_character: Some('…'),
-        ..TextWrapping::default()
-    };
-
-    job
-}
-
 pub struct TopBarStyle {
     /// Height of the top bar
     pub height: f32,
@@ -181,4 +165,24 @@ impl CCUi {
 
         TopBarStyle { height, indent }
     }
+
+    pub fn text_ellipsis(&self, name: &str, max_rows: usize) -> LayoutJob {
+        text_ellipsis(&self.egui_ctx.style(), name, max_rows)
+    }
+}
+
+pub fn text_ellipsis(style: &egui::Style, name: &str, max_rows: usize) -> LayoutJob {
+    let font_id = egui::TextStyle::Body.resolve(&style);
+    let color = style.visuals.text_color();
+    let mut job =
+        LayoutJob::single_section(name.to_string(), egui::TextFormat::simple(font_id, color));
+
+    job.wrap = TextWrapping {
+        max_rows,
+        break_anywhere: true,
+        overflow_character: Some('…'),
+        ..TextWrapping::default()
+    };
+
+    job
 }

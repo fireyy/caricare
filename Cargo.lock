@@ -541,6 +541,7 @@ dependencies = [
  "aliyun-oss-client",
  "anyhow",
  "bytesize",
+ "chrono",
  "directories-next",
  "egui",
  "egui_extras",
@@ -566,7 +567,6 @@ name = "cc_gui"
 version = "0.1.0"
 dependencies = [
  "cc_core",
- "chrono",
  "eframe",
  "egui",
  "egui-notify",

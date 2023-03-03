@@ -46,7 +46,7 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                 };
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                    if ui.button("\u{1f464}").on_hover_text("Logout").clicked() {
+                    if ui.button("\u{2386}").on_hover_text("Logout").clicked() {
                         state.confirm("Do you confirm to logout?", ConfirmAction::Logout);
                     }
                     if ui

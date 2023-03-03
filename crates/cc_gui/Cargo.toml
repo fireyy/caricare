@@ -12,5 +12,4 @@ serde = { workspace = true }
 egui = "0.21.0"
 egui_extras = "0.21.0"
 rfd = "0.10"
-chrono = "0.4"
 egui-notify = "0.6"

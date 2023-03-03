@@ -5,6 +5,7 @@ use aliyun_oss_client::{
     Query,
 };
 use bytesize::ByteSize;
+use chrono::DateTime;
 
 fn get_name_form_path(path: &str) -> String {
     path.split('/')
@@ -67,7 +68,22 @@ impl OssObject {
     }
     #[inline]
     pub fn size_string(&self) -> String {
-        ByteSize(self.size).to_string()
+        if self.size.eq(&0) {
+            "Folder".into()
+        } else {
+            ByteSize(self.size).to_string()
+        }
+    }
+    #[inline]
+    pub fn date_string(&self) -> String {
+        if self.last_modified.is_empty() {
+            "-".into()
+        } else {
+            match DateTime::parse_from_rfc3339(&self.last_modified) {
+                Ok(date) => date.format("%Y-%m-%d %H:%M:%S").to_string(),
+                Err(_) => "_".into(),
+            }
+        }
     }
     pub fn is_file(&self) -> bool {
         self.obj_type == OssObjectType::File

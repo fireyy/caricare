@@ -64,11 +64,14 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                         } else {
                             size * (ui.available_width() / size.x).min(1.0)
                         };
-                        img.show_size(ui, size);
+                        ui.centered_and_justified(|ui| {
+                            img.show_size(ui, size);
+                        });
                     }
                 });
             ui.vertical_centered_justified(|ui| {
                 ui.horizontal(|ui| {
+                    ui.label("\u{1f50d} Zoom: ");
                     if ui.button("\u{2795}").on_hover_text("Zoom In").clicked() {
                         zoom_action(win_size, state, ZoomType::In);
                     }
@@ -89,8 +92,14 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                     ui.output_mut(|o| o.copied_text = url);
                 }
                 ui.horizontal(|ui| {
-                    ui.label(format!("size: {}", state.current_img.size));
-                    ui.label(&state.current_img.last_modified);
+                    ui.label(format!(
+                        "\u{1f5b4} Size: {}",
+                        state.current_img.size_string()
+                    ));
+                    ui.label(format!(
+                        "\u{1f4c5} Last Modified: {}",
+                        state.current_img.date_string()
+                    ));
                 });
             });
         });

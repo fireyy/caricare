@@ -1,9 +1,7 @@
 use super::item_ui;
 use crate::state::{NavgatorType, State, Update};
-use crate::theme::text_ellipsis;
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use cc_core::{OssObject, OssObjectType};
-use chrono::DateTime;
 
 pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
     for i in row_range {
@@ -12,28 +10,17 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                 egui::Frame::none().show(ui, |ui| {
                     ui.set_width(120.);
-                    ui.label(if data.last_modified.is_empty() {
-                        "-".into()
-                    } else {
-                        match DateTime::parse_from_rfc3339(&data.last_modified) {
-                            Ok(date) => date.format("%Y-%m-%d %H:%M:%S").to_string(),
-                            Err(_) => "_".into(),
-                        }
-                    });
+                    ui.label(data.date_string());
                 });
                 egui::Frame::none().show(ui, |ui| {
                     ui.set_width(60.);
-                    ui.label(if data.size.eq(&0) {
-                        "Folder".into()
-                    } else {
-                        data.size_string()
-                    });
+                    ui.label(data.size_string());
                 });
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
                     ui.vertical(|ui| {
                         if ui
                             .add(
-                                egui::Label::new(text_ellipsis(ui, &data.name(), 1))
+                                egui::Label::new(state.cc_ui.text_ellipsis(&data.name(), 1))
                                     .sense(egui::Sense::click()),
                             )
                             .on_hover_text(data.name())
