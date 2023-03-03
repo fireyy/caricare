@@ -6,8 +6,8 @@ use crate::widgets::{
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use cc_core::ShowType;
 
-pub fn main_page(ctx: &egui::Context, state: &mut State) {
-    top_bar_ui(ctx, state);
+pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {
+    top_bar_ui(ctx, state, frame);
     egui::CentralPanel::default().show(ctx, |ui| {
         egui::Frame::none()
             .inner_margin(egui::style::Margin::same(0.0))
@@ -40,11 +40,10 @@ pub fn main_page(ctx: &egui::Context, state: &mut State) {
                 };
 
                 let mut scroller = egui::ScrollArea::vertical()
-                    .id_source("scroller_".to_owned() + &row_height.to_string())
                     .auto_shrink([false; 2])
                     // .enable_scrolling(false)
                     // .hscroll(self.show_type == ShowType::List)
-                    .id_source("content_scroll");
+                    .id_source("scroller_".to_owned() + &row_height.to_string());
 
                 if state.scroll_top {
                     state.scroll_top = false;
@@ -79,5 +78,5 @@ pub fn main_page(ctx: &egui::Context, state: &mut State) {
                 }
             });
     });
-    status_bar_ui(ctx, state);
+    status_bar_ui(ctx, state, frame);
 }

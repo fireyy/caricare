@@ -33,7 +33,7 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                     ui.vertical(|ui| {
                         if ui
                             .add(
-                                egui::Label::new(text_ellipsis(&data.name(), 1))
+                                egui::Label::new(text_ellipsis(ui, &data.name(), 1))
                                     .sense(egui::Sense::click()),
                             )
                             .on_hover_text(data.name())

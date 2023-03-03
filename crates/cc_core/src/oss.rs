@@ -1,3 +1,4 @@
+use crate::log::LogItem;
 use crate::util::get_extension;
 use crate::{CoreError, OssBucket, OssObject, Session};
 use aliyun_oss_client::{
@@ -8,11 +9,6 @@ use aliyun_oss_client::{
 };
 use md5;
 use std::path::PathBuf;
-
-pub enum UploadResult {
-    Success(String),
-    Error(String),
-}
 
 #[derive(Default, Clone)]
 pub struct OssClient {
@@ -91,12 +87,12 @@ impl OssClient {
         result
     }
 
-    pub async fn put_multi(&self, paths: Vec<PathBuf>) -> Result<Vec<UploadResult>, OssError> {
+    pub async fn put_multi(&self, paths: Vec<PathBuf>) -> Result<Vec<LogItem>, OssError> {
         let mut results = vec![];
         for path in paths {
             match self.put(path).await {
-                Ok(str) => results.push(UploadResult::Success(str)),
-                Err(err) => results.push(UploadResult::Error(err.to_string())),
+                Ok(str) => results.push(LogItem::upload().with_success(str)),
+                Err(err) => results.push(LogItem::upload().with_error(err.to_string())),
             }
         }
 

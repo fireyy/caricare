@@ -1,11 +1,12 @@
+use crate::theme;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
-    image_view_ui, result_view_ui,
+    image_view_ui, log_panel_ui,
 };
 use crate::SUPPORT_EXTENSIONS;
 use cc_core::{
-    store, tokio, tracing, util::get_extension, CoreError, ImageCache, ImageFetcher, MemoryHistory,
-    OssBucket, OssClient, OssError, OssObject, Query, Session, Setting, UploadResult,
+    log::LogItem, store, tokio, tracing, util::get_extension, CoreError, ImageCache, ImageFetcher,
+    MemoryHistory, OssBucket, OssClient, OssError, OssObject, Query, Session, Setting,
 };
 use egui_notify::Toasts;
 use std::{path::PathBuf, sync::mpsc, vec};
@@ -37,7 +38,7 @@ pub enum NavgatorType {
 }
 
 pub enum Update {
-    Uploaded(Result<Vec<UploadResult>, OssError>),
+    Uploaded(Result<Vec<LogItem>, OssError>),
     List(Result<OssBucket, OssError>),
     Navgator(NavgatorType),
 }
@@ -64,7 +65,7 @@ pub struct State {
     #[serde(skip)]
     pub images: ImageCache,
     #[serde(skip)]
-    pub upload_result: Vec<UploadResult>,
+    pub logs: Vec<LogItem>,
     pub is_show_result: bool,
     pub current_path: String,
     pub navigator: MemoryHistory,
@@ -81,10 +82,13 @@ pub struct State {
     pub status: Status,
     #[serde(skip)]
     pub toasts: Toasts,
+    #[serde(skip)]
+    pub cc_ui: theme::CCUi,
 }
 
 impl State {
     pub fn new(ctx: &egui::Context) -> Self {
+        let cc_ui = theme::CCUi::load_and_apply(ctx);
         let session = match store::get_latest_session() {
             Some(session) => session,
             None => Session::default(),
@@ -138,7 +142,7 @@ impl State {
             next_query: Some(build_query(current_path.clone(), limit)),
             scroll_top: false,
             images,
-            upload_result: vec![],
+            logs: vec![],
             is_show_result: false,
             current_path: current_path.clone(),
             navigator,
@@ -149,6 +153,7 @@ impl State {
             picked_path: vec![],
             status,
             toasts: Toasts::new(),
+            cc_ui,
         }
     }
 
@@ -158,9 +163,9 @@ impl State {
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
                 Update::Uploaded(result) => match result {
-                    Ok(str) => {
+                    Ok(mut str) => {
                         self.status = Status::Idle(Route::List);
-                        self.upload_result = str;
+                        self.logs.append(&mut str);
                         self.is_show_result = true;
                     }
                     Err(err) => {
@@ -224,8 +229,8 @@ impl State {
         }
 
         if self.oss.is_some() {
-            image_view_ui(ctx, self);
-            result_view_ui(ctx, self);
+            image_view_ui(ctx, self); // TODO: use RightPanel and show_animated
+            log_panel_ui(ctx, self);
         }
 
         self.toasts.show(ctx);
@@ -318,7 +323,7 @@ impl State {
         self.navigator.push(current_path);
         self.oss = Some(client);
         self.refresh(ctx);
-        self.setting.auto_login = false;
+        self.setting.auto_login = true;
         Ok(())
     }
 

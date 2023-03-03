@@ -7,7 +7,7 @@ const SAVE_NOTIF_DURATION: Option<std::time::Duration> = Some(std::time::Duratio
 pub fn auth_page(ctx: &egui::Context, state: &mut State) {
     egui::CentralPanel::default().show(ctx, |ui| {
         egui::Frame::none()
-            // .inner_margin(egui::style::Margin::same(0.0))
+            .inner_margin(egui::style::Margin::symmetric(0.0, 20.0))
             .show(ui, |ui| {
                 egui::Grid::new("auth_form_grid")
                     .spacing([10.0; 2])
@@ -30,6 +30,7 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                     });
 
                 ui.add_space(20.0);
+
                 if ui.button("Save").clicked() {
                     match state.save_auth(ui.ctx()) {
                         Ok(_) => {
@@ -52,7 +53,7 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                 ui.heading("History");
 
                 // auth_history_table(ui, &mut state);
-                let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
+                let text_height = crate::theme::CCUi::table_line_height();
 
                 let table = TableBuilder::new(ui)
                     .striped(true)
@@ -69,7 +70,7 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                     .min_scrolled_height(0.0);
 
                 table
-                    .header(20.0, |mut header| {
+                    .header(crate::theme::CCUi::table_header_height(), |mut header| {
                         header.col(|ui| {
                             ui.strong("ID");
                         });

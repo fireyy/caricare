@@ -569,7 +569,6 @@ dependencies = [
  "chrono",
  "eframe",
  "egui",
- "egui-modal",
  "egui-notify",
  "egui_extras",
  "rfd",
@@ -988,15 +987,6 @@ dependencies = [
  "ron",
  "serde",
  "tracing",
-]
-
-[[package]]
-name = "egui-modal"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa11914b870c1378e83385171fc54642134e98b46196f2dd7cc24a142f2641f5"
-dependencies = [
- "egui",
 ]
 
 [[package]]

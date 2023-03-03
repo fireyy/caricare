@@ -1,5 +1,4 @@
 use crate::state::State;
-use egui_modal::{Modal, ModalStyle};
 
 pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
     let url = state.get_oss_url(&state.current_img.path);
@@ -9,19 +8,18 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
     }
 
     let win_size = ctx.input(|i| i.screen_rect).size();
-    let modal = Modal::new(ctx, "preview_area")
-        // .with_close_on_outside_click(true)
-        .with_style(&ModalStyle {
-            default_width: Some(win_size.x - 200.0),
-            ..Default::default()
-        });
-
-    modal.show(|ui| {
-        modal.title(ui, "Preview");
-        modal.frame(ui, |ui| {
+    let frame = egui::Frame {
+        fill: ctx.style().visuals.panel_fill,
+        ..state.cc_ui.bottom_panel_frame()
+    };
+    egui::SidePanel::right("preview_panel")
+        .default_width(100.0)
+        .resizable(true)
+        .frame(frame)
+        .show_animated(ctx, state.is_preview, |ui| {
             egui::ScrollArea::vertical()
                 .auto_shrink([false; 2])
-                .max_height(win_size.y - 150.0)
+                .max_height(win_size.y - 80.0)
                 .show(ui, |ui| {
                     if let Some(img) = state.images.get(&url) {
                         let mut size = img.size_vec2();
@@ -41,14 +39,4 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                 });
             });
         });
-        modal.buttons(ui, |ui| {
-            if modal.button(ui, "close").clicked() {
-                state.is_preview = false;
-            };
-        });
-    });
-
-    if state.is_preview {
-        modal.open();
-    }
 }

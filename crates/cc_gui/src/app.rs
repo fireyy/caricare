@@ -23,12 +23,12 @@ impl eframe::App for App {
         self.state.setting.store();
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.state.init(ctx);
         match &mut self.state.status {
             Status::Idle(ref mut route) => match route {
                 Route::Auth => auth_page(ctx, &mut self.state),
-                Route::List => main_page(ctx, &mut self.state),
+                Route::List => main_page(ctx, &mut self.state, frame),
                 _ => {}
             },
             Status::Busy(_) => {

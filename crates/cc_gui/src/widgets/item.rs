@@ -34,7 +34,7 @@ pub fn item_ui(
                 }
             });
             ui.vertical(|ui| {
-                ui.label(text_ellipsis(&data.name(), 1));
+                ui.label(text_ellipsis(ui, &data.name(), 1));
                 ui.label(
                     RichText::new(if data.size.eq(&0) {
                         "Folder".into()
