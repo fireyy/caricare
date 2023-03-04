@@ -234,7 +234,7 @@ impl State {
         }
 
         if self.oss.is_some() {
-            image_view_ui(ctx, self); // TODO: use RightPanel and show_animated
+            image_view_ui(ctx, self);
             log_panel_ui(ctx, self);
         }
 

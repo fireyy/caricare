@@ -573,6 +573,7 @@ dependencies = [
  "egui_extras",
  "rfd",
  "serde",
+ "tracing",
 ]
 
 [[package]]

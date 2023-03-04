@@ -4,7 +4,7 @@ use crate::state::{Route, State, Status};
 pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe::Frame) {
     let frame = egui::Frame {
         fill: state.cc_ui.design_tokens.bottom_bar_color,
-        inner_margin: egui::Vec2::splat(3.0).into(),
+        inner_margin: egui::Vec2::new(10.0, 3.0).into(),
         ..Default::default()
     };
     egui::TopBottomPanel::bottom("status_bar")
@@ -39,14 +39,19 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                 }
 
                 let style = &ui.style().visuals;
+                let n_color = style.text_color();
                 let color = if state.is_show_result {
                     style.hyperlink_color
                 } else {
-                    style.text_color()
+                    n_color
                 };
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                    if ui.button("\u{2386}").on_hover_text("Logout").clicked() {
+                    if ui
+                        .button(egui::RichText::new("\u{2386}").color(n_color))
+                        .on_hover_text("Logout")
+                        .clicked()
+                    {
                         state.confirm("Do you confirm to logout?", ConfirmAction::Logout);
                     }
                     if ui

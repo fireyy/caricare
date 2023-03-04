@@ -11,15 +11,17 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
-// let delta = zoomratio(delta_y, state.scale);
-// let new_scale = state.scale + delta;
-// // limit scale
-// if new_scale > 0.01 && new_scale < 40. {
-//     state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-//     state.scale += delta;
-// }
+fn mouse_wheel_zoom(delta: f32, pointer_delta: Vec2, state: &mut State) {
+    let delta = zoomratio((delta - 1.0) * 2.0, state.img_zoom);
+    let new_scale = state.img_zoom + delta;
+    // limit scale
+    if new_scale > 0.01 && new_scale < 40. {
+        state.offset -= scale_pt(state.offset, pointer_delta, state.img_zoom, delta);
+        state.img_zoom += delta;
+    }
+}
 
-pub fn scale_pt(origin: Vec2, pt: Vec2, scale: f32, scale_inc: f32) -> Vec2 {
+fn scale_pt(origin: Vec2, pt: Vec2, scale: f32, scale_inc: f32) -> Vec2 {
     ((pt - origin) * scale_inc) / scale
 }
 
@@ -53,7 +55,7 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
         .resizable(true)
         .frame(frame)
         .show_animated(ctx, state.is_preview, |ui| {
-            egui::ScrollArea::both()
+            let resp = egui::ScrollArea::both()
                 .auto_shrink([false; 2])
                 .max_height(win_size.y - 100.0)
                 .show(ui, |ui| {
@@ -69,6 +71,27 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                         });
                     }
                 });
+
+            if ui.rect_contains_pointer(resp.inner_rect) {
+                let (zoom, pointer_delta, _pointer_down, _modifiers) = ui.input(|i| {
+                    let zoom = i.events.iter().find_map(|e| match e {
+                        egui::Event::Zoom(v) => Some(*v),
+                        _ => None,
+                    });
+                    (
+                        zoom,
+                        i.pointer.interact_pos(),
+                        i.pointer.primary_down(),
+                        i.modifiers,
+                    )
+                });
+                if let Some(zoom) = zoom {
+                    // tracing::info!("zoom: {:?}, pointer: {:?}", zoom, pointer_delta,);
+                    if let Some(pointer_delta) = pointer_delta {
+                        mouse_wheel_zoom(zoom, pointer_delta.to_vec2(), state);
+                    }
+                }
+            }
             ui.vertical_centered_justified(|ui| {
                 ui.horizontal(|ui| {
                     ui.label("\u{1f50d} Zoom: ");

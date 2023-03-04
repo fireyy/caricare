@@ -38,6 +38,7 @@ cc_gui = { path = "crates/cc_gui" }
 eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
+tracing = "0.1.29"
 
 [profile.dev]
 opt-level = 1 # Make debug builds run faster

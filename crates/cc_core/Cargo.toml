@@ -9,7 +9,7 @@ edition = "2021"
 # aliyun-oss-client = "0.10.1"
 aliyun-oss-client = { git = "https://github.com/tu6ge/oss-rs.git", rev = "84a89cd" }
 # aliyun-oss-client = { path = "../../oss-rs" }
-tracing = "0.1.29"
+tracing = { workspace = true }
 tracing-subscriber = "0.3.0"
 md5 = "0.7"
 infer = "0.11.0"
