@@ -3,7 +3,7 @@ use crate::util::get_extension;
 use crate::{CoreError, OssBucket, OssObject, Session};
 use aliyun_oss_client::{
     errors::OssError,
-    file::{FileAs, FileError},
+    file::{FileAs, FileError, Files},
     object::ObjectList,
     BucketName, Client, Query,
 };
@@ -125,6 +125,12 @@ impl OssClient {
 
     pub async fn get_list2(self, query: Query) -> Result<ObjectList, OssError> {
         let result = self.client.get_object_list(query).await;
+        tracing::info!("Result: {:?}", result);
+        result
+    }
+
+    pub async fn delete_object(self, obj: OssObject) -> Result<(), FileError> {
+        let result = self.client.delete_object(obj.path.parse()?).await;
         tracing::info!("Result: {:?}", result);
         result
     }

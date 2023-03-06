@@ -55,9 +55,14 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
         .resizable(true)
         .frame(frame)
         .show_animated(ctx, state.is_preview, |ui| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                if ui.button("\u{274c}").on_hover_text("Close panel").clicked() {
+                    state.is_preview = false;
+                }
+            });
             let resp = egui::ScrollArea::both()
                 .auto_shrink([false; 2])
-                .max_height(win_size.y - 100.0)
+                .max_height(win_size.y - 110.0)
                 .show(ui, |ui| {
                     if let Some(img) = state.images.get(&url) {
                         let mut size = img.size_vec2();

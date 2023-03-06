@@ -1,9 +1,11 @@
+use cc_core::OssObject;
 use cc_core::Session;
 
 #[derive(Clone)]
 pub enum ConfirmAction {
     Logout,
     RemoveSession(Session),
+    RemoveFile(OssObject),
 }
 
 pub struct Confirm {

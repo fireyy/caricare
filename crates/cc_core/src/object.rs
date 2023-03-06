@@ -28,6 +28,7 @@ pub struct OssObject {
     pub path: String,
     pub size: u64,
     pub last_modified: String,
+    pub selected: bool,
 }
 
 impl RefineObject for OssObject {
@@ -126,6 +127,7 @@ impl RefineObjectList<OssObject> for OssBucket {
                 path: val.to_string(),
                 size: 0,
                 last_modified: "".into(),
+                selected: false,
             });
         }
         Ok(())

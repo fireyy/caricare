@@ -41,6 +41,7 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
 
                 let mut scroller = egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
+                    .always_show_scroll(true)
                     // .enable_scrolling(false)
                     // .hscroll(self.show_type == ShowType::List)
                     .id_source("scroller_".to_owned() + &row_height.to_string());

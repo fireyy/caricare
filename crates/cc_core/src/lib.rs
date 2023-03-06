@@ -3,22 +3,17 @@ mod history;
 mod image_cache;
 pub mod log;
 mod object;
-mod oss;
+// mod oss;
 pub mod runtime;
 mod session;
 mod setting;
 pub mod store;
 pub mod util;
-pub use aliyun_oss_client::{
-    errors::OssError,
-    object::{Object, ObjectList},
-    Query,
-};
 pub use error::CoreError;
 pub use history::MemoryHistory;
 pub use image_cache::{ImageCache, ImageFetcher};
 pub use object::{OssBucket, OssObject, OssObjectType};
-pub use oss::OssClient;
+// pub use oss::OssClient;
 pub use session::Session;
 pub use setting::{Setting, ShowType};
 pub use tokio;

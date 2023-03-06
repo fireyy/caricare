@@ -1,38 +1,72 @@
 use super::item_ui;
 use crate::state::{NavgatorType, State, Update};
+use crate::widgets::confirm::ConfirmAction;
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
-use cc_core::{OssObject, OssObjectType};
+use cc_core::OssObjectType;
 
 pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
-    for i in row_range {
-        if let Some(data) = state.list.get(i) {
-            let data = data.clone();
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                egui::Frame::none().show(ui, |ui| {
-                    ui.set_width(120.);
-                    ui.label(data.date_string());
-                });
-                egui::Frame::none().show(ui, |ui| {
-                    ui.set_width(60.);
-                    ui.label(data.size_string());
-                });
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                    ui.vertical(|ui| {
-                        if ui
-                            .add(
-                                egui::Label::new(state.cc_ui.text_ellipsis(&data.name(), 1))
-                                    .sense(egui::Sense::click()),
-                            )
-                            .on_hover_text(data.name())
-                            .clicked()
-                        {
-                            handle_click(&data, ui, state);
+    egui::Grid::new(format!("list"))
+        .num_columns(1)
+        .striped(true)
+        .show(ui, |ui| {
+            for data in state.list[row_range].iter_mut() {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                    egui::Frame::none().show(ui, |ui| {
+                        ui.set_width(60.);
+                        if ui.button("\u{1f5d1}").on_hover_text("Delete").clicked() {
+                            state.confirm.show(
+                                format!("Do you confirm to delete this item: {}?", data.path()),
+                                ConfirmAction::RemoveFile(data.clone()),
+                            );
                         }
+                        //TODO：download file
+                        // if ui.button("\u{1f4e9}").on_hover_text("Download").clicked() {
+                        //     //
+                        // }
+                    });
+                    egui::Frame::none().show(ui, |ui| {
+                        ui.set_width(120.);
+                        ui.label(data.date_string());
+                    });
+                    egui::Frame::none().show(ui, |ui| {
+                        ui.set_width(60.);
+                        ui.label(data.size_string());
+                    });
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                        ui.checkbox(&mut data.selected, "");
+                        ui.vertical(|ui| {
+                            if ui
+                                .add(
+                                    egui::Label::new(
+                                        state.cc_ui.text_ellipsis(&data.name().as_ref(), 1),
+                                    )
+                                    .sense(egui::Sense::click()),
+                                )
+                                .on_hover_text(data.name())
+                                .clicked()
+                            {
+                                match data.obj_type {
+                                    OssObjectType::File => {
+                                        state.current_img = data.clone();
+                                        state.is_preview = true;
+                                        ui.ctx().request_repaint();
+                                    }
+                                    OssObjectType::Folder => {
+                                        state
+                                            .update_tx
+                                            .send(Update::Navgator(NavgatorType::New(
+                                                data.path.clone(),
+                                            )))
+                                            .unwrap();
+                                    }
+                                }
+                            }
+                        });
                     });
                 });
-            });
-        }
-    }
+                ui.end_row();
+            }
+        });
 }
 
 pub fn thumb_ui(
@@ -54,29 +88,28 @@ pub fn thumb_ui(
                 for j in 0..num_cols {
                     if let Some(d) = state.list.get(j + i * num_cols) {
                         let url = state.get_oss_url(&d.path);
-                        let resp = item_ui(ui, d.clone(), url.clone(), &mut state.images);
+                        let data = d.clone();
+                        let resp = item_ui(ui, &data, url.clone(), &mut state.images);
                         if resp.on_hover_text(d.name()).clicked() {
-                            handle_click(&d.clone(), ui, state);
+                            match data.obj_type {
+                                OssObjectType::File => {
+                                    state.current_img = data;
+                                    state.is_preview = true;
+                                    ui.ctx().request_repaint();
+                                }
+                                OssObjectType::Folder => {
+                                    state
+                                        .update_tx
+                                        .send(Update::Navgator(NavgatorType::New(
+                                            data.path.clone(),
+                                        )))
+                                        .unwrap();
+                                }
+                            }
                         }
                     }
                 }
                 ui.end_row();
             }
         });
-}
-
-fn handle_click(data: &OssObject, ui: &mut egui::Ui, state: &mut State) {
-    match data.obj_type {
-        OssObjectType::File => {
-            state.current_img = data.clone();
-            state.is_preview = true;
-            ui.ctx().request_repaint();
-        }
-        OssObjectType::Folder => {
-            state
-                .update_tx
-                .send(Update::Navgator(NavgatorType::New(data.path.clone())))
-                .unwrap();
-        }
-    }
 }

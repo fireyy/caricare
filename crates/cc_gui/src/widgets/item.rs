@@ -6,7 +6,7 @@ use egui::RichText;
 
 pub fn item_ui(
     ui: &mut egui::Ui,
-    data: OssObject,
+    data: &OssObject,
     url: String,
     images: &mut ImageCache,
 ) -> egui::Response {

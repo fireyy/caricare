@@ -1,6 +1,5 @@
 use crate::error::CoreError;
 use crate::regex;
-use aliyun_oss_client::config::Config;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 
@@ -39,14 +38,14 @@ impl Session {
         self.key_id.is_empty()
     }
 
-    pub fn config(&self) -> Result<Config, CoreError> {
-        Ok(Config::try_new(
-            self.key_id.clone(),
-            self.key_secret.clone(),
-            self.endpoint.clone(),
-            self.bucket.clone(),
-        )?)
-    }
+    // pub fn config(&self) -> Result<Config, CoreError> {
+    //     Ok(Config::try_new(
+    //         self.key_id.clone(),
+    //         self.key_secret.clone(),
+    //         self.endpoint.clone(),
+    //         self.bucket.clone(),
+    //     )?)
+    // }
 
     pub fn key_secret_mask(&self) -> String {
         regex!(r"(?P<prefix>\w{3})(?P<replace_value>\w*)(?P<suffix>\w{3})")

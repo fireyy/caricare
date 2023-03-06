@@ -14,3 +14,4 @@ egui_extras = "0.21.0"
 rfd = "0.10"
 egui-notify = "0.6"
 tracing = { workspace = true }
+cc_oss = { workspace = true }

@@ -1,12 +1,14 @@
 use crate::theme;
 use crate::widgets::{
+    action_bar_ui,
     confirm::{Confirm, ConfirmAction},
     image_view_ui, log_panel_ui,
 };
 use crate::SUPPORT_EXTENSIONS;
 use cc_core::{
-    log::LogItem, store, tokio, tracing, util::get_extension, CoreError, ImageCache, ImageFetcher,
-    MemoryHistory, OssBucket, OssClient, OssError, OssObject, Query, Session, Setting,
+    log::LogItem, store, tokio, tracing, util::get_extension, CoreError, FileError, ImageCache,
+    ImageFetcher, MemoryHistory, OssBucket, OssClient, OssError, OssObject, Query, Session,
+    Setting,
 };
 use egui_notify::Toasts;
 use std::{path::PathBuf, sync::mpsc, vec};
@@ -41,6 +43,7 @@ pub enum Update {
     Uploaded(Result<Vec<LogItem>, OssError>),
     List(Result<OssBucket, OssError>),
     Navgator(NavgatorType),
+    Deleted(Result<(), FileError>),
 }
 
 #[derive(serde::Serialize)]
@@ -209,6 +212,16 @@ impl State {
                     self.current_path = self.navigator.location();
                     self.refresh(ctx);
                 }
+                Update::Deleted(result) => match result {
+                    Ok(_) => {
+                        //
+                        self.toasts.success("Delete Successed");
+                    }
+                    Err(err) => {
+                        self.status = Status::Idle(Route::List);
+                        self.err = Some(err.to_string());
+                    }
+                },
             }
         }
 
@@ -236,6 +249,7 @@ impl State {
         if self.oss.is_some() {
             image_view_ui(ctx, self);
             log_panel_ui(ctx, self);
+            action_bar_ui(ctx, self);
         }
 
         self.toasts.show(ctx);
@@ -265,6 +279,22 @@ impl State {
             tokio::spawn(async move {
                 let res = oss.put_multi(picked_path).await;
                 update_tx.send(Update::Uploaded(res)).unwrap();
+                ctx.request_repaint();
+            });
+        });
+    }
+
+    pub fn delete_object(&mut self, ctx: &egui::Context, file: OssObject) {
+        self.status = Status::Busy(Route::List);
+
+        let update_tx = self.update_tx.clone();
+        let ctx = ctx.clone();
+        let oss = self.oss().clone();
+
+        cc_core::runtime::spawn(async move {
+            tokio::spawn(async move {
+                let res = oss.delete_object(file).await;
+                update_tx.send(Update::Deleted(res)).unwrap();
                 ctx.request_repaint();
             });
         });
@@ -345,6 +375,9 @@ impl State {
                 }
                 ConfirmAction::RemoveSession(session) => {
                     store::delete_session_by_name(&session.key_id);
+                }
+                ConfirmAction::RemoveFile(obj) => {
+                    self.delete_object(ctx, obj);
                 }
             }
         }
