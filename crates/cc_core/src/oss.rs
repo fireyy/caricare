@@ -124,6 +124,16 @@ impl OssClient {
         res
     }
 
+    pub async fn create_object(self, path: String) -> Result<(), Error> {
+        let result = self
+            .client
+            .put_object(&[0], path, None::<HashMap<&str, &str>>, None)
+            .await;
+
+        tracing::info!("Result: {:?}", result);
+        result
+    }
+
     pub async fn delete_object(self, obj: OssObject) -> Result<(), Error> {
         let result = self.client.delete_object(obj.key()).await;
         tracing::info!("Result: {:?}", result);

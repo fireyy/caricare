@@ -276,7 +276,7 @@ impl ObjectAPI for OSS {
         let resp = self.http_client.get(host).headers(headers).send().await?;
 
         let xml_str = resp.text().await?;
-        tracing::debug!("XML: {}", xml_str);
+        // tracing::debug!("XML: {}", xml_str);
         let mut result = Vec::new();
         let mut reader = Reader::from_str(xml_str.as_str());
         reader.trim_text(true);

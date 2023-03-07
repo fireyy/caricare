@@ -11,7 +11,7 @@ use super::auth::*;
 use super::errors::Error;
 use super::utils::*;
 
-const RESOURCES: [&str; 50] = [
+const RESOURCES: [&str; 51] = [
     "acl",
     "uploads",
     "location",
@@ -62,6 +62,7 @@ const RESOURCES: [&str; 50] = [
     "restore",
     "callback",
     "callback-var",
+    "continuation-token",
 ];
 
 #[derive(Clone, Debug, Default)]
