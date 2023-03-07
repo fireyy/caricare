@@ -3,7 +3,7 @@ mod history;
 mod image_cache;
 pub mod log;
 mod object;
-// mod oss;
+mod oss;
 pub mod runtime;
 mod session;
 mod setting;
@@ -13,14 +13,16 @@ pub use error::CoreError;
 pub use history::MemoryHistory;
 pub use image_cache::{ImageCache, ImageFetcher};
 pub use object::{OssBucket, OssObject, OssObjectType};
-// pub use oss::OssClient;
+pub use oss::OssClient;
 pub use session::Session;
 pub use setting::{Setting, ShowType};
 pub use tokio;
 pub use tracing;
 
+const LOG_LEVEL: &str = "debug";
+
 pub fn init_core() {
-    let mut rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned());
+    let mut rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| LOG_LEVEL.to_owned());
 
     const LOUD_CRATES: [&str; 7] = [
         // wgpu crates spam a lot on info level, which is really annoying

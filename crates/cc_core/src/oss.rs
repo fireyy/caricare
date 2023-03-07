@@ -1,36 +1,39 @@
 use crate::log::LogItem;
 use crate::util::get_extension;
-use crate::{CoreError, OssBucket, OssObject, Session};
-use aliyun_oss_client::{
-    errors::OssError,
-    file::{FileAs, FileError, Files},
-    object::ObjectList,
-    BucketName, Client, Query,
-};
+use crate::{CoreError, Session};
+use cc_oss::object::Object as OssObject;
+use cc_oss::prelude::*;
+use cc_oss::{errors::Error, query::Query};
 use md5;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Default, Clone)]
 pub struct OssClient {
-    session: Session,
+    // session: Session,
     path: String,
     url: String,
-    client: Client,
+    client: OSS,
 }
 
 impl OssClient {
     pub fn new(session: &Session) -> Result<Self, CoreError> {
         let path = std::env::var("ALIYUN_BUCKET_PATH").unwrap_or("".to_string());
         let url = std::env::var("CDN_URL").unwrap_or("".to_string());
-        let config = session.clone().config()?;
+        // let config = session.clone().config()?;
 
-        let client = Client::from_config(config);
+        let client = OSS::new(
+            session.key_id.clone(),
+            session.key_secret.clone(),
+            session.endpoint.clone(),
+            session.bucket.clone(),
+        );
 
         Ok(Self {
             path,
             url,
             client,
-            session: session.clone(),
+            // session: session.clone(),
         })
     }
 
@@ -40,7 +43,7 @@ impl OssClient {
     //     endpoint
     // }
 
-    pub fn get_file_url(&self, path: &String) -> String {
+    pub fn get_file_url(&self, path: &str) -> String {
         format!("{}{path}", self.get_url())
         // self.client
         //     .get_endpoint_url()
@@ -55,43 +58,53 @@ impl OssClient {
 
     pub fn get_url(&self) -> String {
         if self.url.is_empty() {
-            self.client.get_bucket_url().to_string()
+            self.client.get_bucket_url()
         } else {
             self.url.clone()
         }
     }
 
-    pub fn client(&self) -> &Client {
+    pub fn client(&self) -> &OSS {
         &self.client
     }
 
-    pub fn get_bucket_name(&self) -> String {
-        self.client.get_bucket_base().name().to_string()
+    pub fn get_bucket_name(&self) -> &str {
+        self.client.bucket()
     }
 
-    pub async fn put(&self, path: PathBuf) -> Result<String, FileError> {
+    pub async fn put(&self, path: PathBuf) -> Result<(), Error> {
         // let path = PathBuf::from(path);
         let path_clone = path.clone();
         let bucket_path = self.path.clone();
         let ext = get_extension(path_clone);
         let file_content = std::fs::read(path).unwrap();
         let key = format!("{}/{:x}.{}", bucket_path, md5::compute(&file_content), ext);
-        let get_content_type = |content: &Vec<u8>| match infer::get(content) {
-            Some(con) => Some(con.mime_type()),
-            None => None,
-        };
+        // let get_content_type = |content: &Vec<u8>| match infer::get(content) {
+        //     Some(con) => Some(con.mime_type()),
+        //     None => None,
+        // };
+        // let content_type = match infer::get(&file_content) {
+        //     Some(con) => Some(con.mime_type()),
+        //     None => None,
+        // };
+        let content_length = file_content.len().to_string();
+        let mut headers = HashMap::new();
+        headers.insert("content-length", content_length.as_str());
+        if let Some(con) = infer::get(&file_content) {
+            headers.insert("content-type", con.mime_type());
+        }
         let result = self
             .client
-            .put_content_as(file_content, key, get_content_type)
+            .put_object(&file_content, key, headers, None)
             .await;
         result
     }
 
-    pub async fn put_multi(&self, paths: Vec<PathBuf>) -> Result<Vec<LogItem>, OssError> {
+    pub async fn put_multi(&self, paths: Vec<PathBuf>) -> Result<Vec<LogItem>, Error> {
         let mut results = vec![];
         for path in paths {
             match self.put(path).await {
-                Ok(str) => results.push(LogItem::upload().with_success(str)),
+                Ok(_) => results.push(LogItem::upload().with_success("upload success".into())),
                 Err(err) => results.push(LogItem::upload().with_error(err.to_string())),
             }
         }
@@ -99,38 +112,20 @@ impl OssClient {
         Ok(results)
     }
 
-    pub async fn get_list(self, query: Query) -> Result<OssBucket, OssError> {
-        let mut bucket = OssBucket::default();
-        let bucket_name = self.session.bucket;
-        let init_file = || OssObject::default();
-
+    pub async fn get_list(self, query: Query) -> Result<ListObjects, Error> {
         tracing::debug!("Query: {:?}", query);
 
-        let res: Result<_, OssError> = self
-            .client
-            .base_object_list(
-                bucket_name.parse::<BucketName>().unwrap(),
-                query,
-                &mut bucket,
-                init_file,
-            )
-            .await;
+        let query = query.to_hashmap();
 
-        res?;
+        let res: Result<ListObjects, Error> = self.client.list_object(None, query).await;
 
-        tracing::debug!("Result: {:?}", bucket);
+        tracing::debug!("Result: {:?}", res);
 
-        Ok(bucket)
+        res
     }
 
-    pub async fn get_list2(self, query: Query) -> Result<ObjectList, OssError> {
-        let result = self.client.get_object_list(query).await;
-        tracing::info!("Result: {:?}", result);
-        result
-    }
-
-    pub async fn delete_object(self, obj: OssObject) -> Result<(), FileError> {
-        let result = self.client.delete_object(obj.path.parse()?).await;
+    pub async fn delete_object(self, obj: OssObject) -> Result<(), Error> {
+        let result = self.client.delete_object(obj.key()).await;
         tracing::info!("Result: {:?}", result);
         result
     }

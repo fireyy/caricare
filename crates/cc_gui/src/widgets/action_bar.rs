@@ -1,7 +1,7 @@
 use crate::state::State;
 
 pub fn action_bar_ui(ctx: &egui::Context, state: &mut State) {
-    let has_selected = state.list.iter().find(|x| x.selected);
+    let has_selected = state.list.iter().find(|x| x.selected());
     let frame = egui::Frame {
         fill: ctx.style().visuals.panel_fill,
         ..state.cc_ui.bottom_panel_frame()

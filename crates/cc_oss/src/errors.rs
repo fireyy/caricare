@@ -16,6 +16,15 @@ pub enum Error {
     Http(HttpError),
 }
 
+impl Error {
+    /// 返回 oss 服务端的错误信息
+    pub fn message(self) -> String {
+        match self {
+            _ => self.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Display)]
 pub enum HttpError {
     HttpInvalidHeaderValue(HttpInvalidHeaderValueError),

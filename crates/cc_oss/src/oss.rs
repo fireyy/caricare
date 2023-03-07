@@ -1,7 +1,6 @@
 use chrono::prelude::*;
 use reqwest::header::{HeaderMap, DATE};
 use reqwest::Client;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::str;
 use std::time::{Duration, SystemTime};
@@ -65,12 +64,12 @@ const RESOURCES: [&str; 50] = [
     "callback-var",
 ];
 
-#[derive(Clone, Debug)]
-pub struct OSS<'a> {
-    key_id: Cow<'a, str>,
-    key_secret: Cow<'a, str>,
-    endpoint: Cow<'a, str>,
-    bucket: Cow<'a, str>,
+#[derive(Clone, Debug, Default)]
+pub struct OSS {
+    key_id: String,
+    key_secret: String,
+    endpoint: String,
+    bucket: String,
 
     pub(crate) http_client: Client,
 }
@@ -81,18 +80,18 @@ pub struct Options {
     pub timeout: Option<Duration>,
 }
 
-impl<'a> OSS<'a> {
-    pub fn new<S>(key_id: S, key_secret: S, endpoint: S, bucket: S) -> Self
-    where
-        S: Into<Cow<'a, str>>,
-    {
+impl OSS {
+    pub fn new(key_id: String, key_secret: String, endpoint: String, bucket: String) -> Self {
         Self::new_with_opts(key_id, key_secret, endpoint, bucket, Default::default())
     }
 
-    pub fn new_with_opts<S>(key_id: S, key_secret: S, endpoint: S, bucket: S, opts: Options) -> Self
-    where
-        S: Into<Cow<'a, str>>,
-    {
+    pub fn new_with_opts(
+        key_id: String,
+        key_secret: String,
+        endpoint: String,
+        bucket: String,
+        opts: Options,
+    ) -> Self {
         let mut builder = Client::builder();
         if let Some(timeout) = opts.timeout {
             builder = builder.timeout(timeout);
@@ -103,7 +102,7 @@ impl<'a> OSS<'a> {
 
         let http_client = builder.build().expect("Build http client failed");
         OSS {
-            key_id: key_id.into(),
+            key_id: key_id,
             key_secret: key_secret.into(),
             endpoint: endpoint.into(),
             bucket: bucket.into(),
@@ -113,6 +112,18 @@ impl<'a> OSS<'a> {
 
     pub fn bucket(&self) -> &str {
         &self.bucket
+    }
+
+    pub fn get_bucket_url(&self) -> String {
+        let url = &self.endpoint;
+        let name_str = self.bucket.to_string();
+
+        let mut name = String::from("https://");
+        name.push_str(&name_str);
+        name.push('.');
+
+        let bucket_url = url.replace("https://", &name);
+        bucket_url
     }
 
     pub fn endpoint(&self) -> &str {
@@ -127,7 +138,7 @@ impl<'a> OSS<'a> {
         &self.key_secret
     }
 
-    pub fn set_bucket(&mut self, bucket: &'a str) {
+    pub fn set_bucket(&mut self, bucket: &str) {
         self.bucket = bucket.into()
     }
 
@@ -228,6 +239,12 @@ impl<'a> OSS<'a> {
             HeaderMap::new()
         };
         headers.insert(DATE, date.parse()?);
+        tracing::debug!(
+            "Headers: {:?}, Params: {}, Resource: {}",
+            headers,
+            params_str,
+            resources_str
+        );
         let authorization = self.oss_sign(
             req_type.as_str(),
             self.key_id(),

@@ -6,9 +6,13 @@ use crate::widgets::{
 };
 use crate::SUPPORT_EXTENSIONS;
 use cc_core::{
-    log::LogItem, store, tokio, tracing, util::get_extension, CoreError, FileError, ImageCache,
-    ImageFetcher, MemoryHistory, OssBucket, OssClient, OssError, OssObject, Query, Session,
-    Setting,
+    log::LogItem, store, tokio, tracing, util::get_extension, CoreError, ImageCache, ImageFetcher,
+    MemoryHistory, OssClient, Session, Setting,
+};
+use cc_oss::{
+    errors::Error as OssError,
+    object::{ListObjects, Object as OssObject},
+    query::Query,
 };
 use egui_notify::Toasts;
 use std::{path::PathBuf, sync::mpsc, vec};
@@ -41,54 +45,38 @@ pub enum NavgatorType {
 
 pub enum Update {
     Uploaded(Result<Vec<LogItem>, OssError>),
-    List(Result<OssBucket, OssError>),
+    List(Result<ListObjects, OssError>),
     Navgator(NavgatorType),
-    Deleted(Result<(), FileError>),
+    Deleted(Result<(), OssError>),
 }
 
-#[derive(serde::Serialize)]
-#[serde(default)]
 pub struct State {
-    #[serde(skip)]
     pub oss: Option<OssClient>,
     pub list: Vec<OssObject>,
     pub current_img: OssObject,
-    #[serde(skip)]
     pub update_tx: mpsc::SyncSender<Update>,
-    #[serde(skip)]
     pub update_rx: mpsc::Receiver<Update>,
-    #[serde(skip)]
     pub confirm_rx: mpsc::Receiver<ConfirmAction>,
     pub setting: Setting,
     pub is_preview: bool,
     pub img_zoom: f32,
-    #[serde(skip)]
     pub offset: egui::Vec2,
     pub loading_more: bool,
-    #[serde(skip)]
     pub next_query: Option<Query>,
     pub scroll_top: bool,
-    #[serde(skip)]
     pub images: ImageCache,
-    #[serde(skip)]
     pub logs: Vec<LogItem>,
     pub is_show_result: bool,
     pub current_path: String,
     pub navigator: MemoryHistory,
-    #[serde(skip)]
     pub confirm: Confirm,
     pub session: Session,
     pub sessions: Vec<Session>,
     pub err: Option<String>,
-    #[serde(skip)]
     pub dropped_files: Vec<egui::DroppedFile>,
-    #[serde(skip)]
     pub picked_path: Vec<PathBuf>,
-    #[serde(skip)]
     pub status: Status,
-    #[serde(skip)]
     pub toasts: Toasts,
-    #[serde(skip)]
     pub cc_ui: theme::CCUi,
 }
 
@@ -119,7 +107,6 @@ impl State {
         let mut status = Status::Idle(Route::List);
 
         let setting = Setting::load();
-        let limit = setting.page_limit;
 
         if !session.is_empty() && setting.auto_login {
             match OssClient::new(&session) {
@@ -134,7 +121,7 @@ impl State {
             status = Status::Idle(Route::Auth);
         }
 
-        Self {
+        let mut this = Self {
             setting,
             oss,
             current_img: OssObject::default(),
@@ -147,7 +134,7 @@ impl State {
             img_zoom: 1.0,
             offset: Default::default(),
             loading_more: false,
-            next_query: Some(build_query(current_path.clone(), limit)),
+            next_query: None,
             scroll_top: false,
             images,
             logs: vec![],
@@ -162,7 +149,11 @@ impl State {
             status,
             toasts: Toasts::new(),
             cc_ui,
-        }
+        };
+
+        this.next_query = Some(this.build_query(None));
+
+        this
     }
 
     pub fn init(&mut self, ctx: &egui::Context) {
@@ -183,7 +174,11 @@ impl State {
                 },
                 Update::List(result) => match result {
                     Ok(str) => {
-                        self.next_query = str.next_query();
+                        if let Some(token) = str.next_continuation_token() {
+                            self.next_query = Some(self.build_query(Some(token.clone())));
+                        } else {
+                            self.next_query = None;
+                        }
                         self.set_list(str);
                         self.loading_more = false;
                         self.status = Status::Idle(Route::List);
@@ -259,7 +254,7 @@ impl State {
         self.oss.as_ref().expect("Oss not initialized yet")
     }
 
-    pub fn get_oss_url(&self, path: &String) -> String {
+    pub fn get_oss_url(&self, path: &str) -> String {
         self.oss().get_file_url(path)
     }
 
@@ -321,12 +316,12 @@ impl State {
         }
     }
 
-    pub fn set_list(&mut self, obj: OssBucket) {
+    pub fn set_list(&mut self, obj: ListObjects) {
         let mut dirs = obj.common_prefixes;
         let mut files: Vec<OssObject> = obj
-            .files
+            .objects
             .into_iter()
-            .filter(|x| !x.path.ends_with('/'))
+            .filter(|x| !x.key().ends_with('/'))
             .collect();
         self.list.append(&mut dirs);
         self.list.append(&mut files);
@@ -345,9 +340,25 @@ impl State {
         self.err = None;
         self.scroll_top = true;
         let current_path = self.navigator.location();
-        self.next_query = Some(build_query(current_path, self.setting.page_limit));
+        self.current_path = current_path;
+        self.next_query = Some(self.build_query(None));
         self.list = vec![];
         self.get_list(ctx);
+    }
+
+    fn build_query(&self, next_token: Option<String>) -> Query {
+        let mut path = self.current_path.clone();
+        if !path.ends_with('/') && !path.is_empty() {
+            path.push_str("/");
+        }
+        let mut query = Query::new();
+        query.insert("prefix", path);
+        query.insert("delimiter", "/");
+        query.insert("max-keys", self.setting.page_limit);
+        if let Some(token) = next_token {
+            query.insert("continuation-token", token);
+        }
+        query
     }
 
     pub fn save_auth(&mut self, ctx: &egui::Context) -> Result<(), CoreError> {
@@ -386,16 +397,4 @@ impl State {
     pub fn confirm(&mut self, message: impl Into<String>, action: ConfirmAction) {
         self.confirm.show(message, action);
     }
-}
-
-fn build_query(path: String, limit: u16) -> Query {
-    let mut path = path.clone();
-    if !path.ends_with('/') && !path.is_empty() {
-        path.push_str("/");
-    }
-    let mut query = Query::new();
-    query.insert("prefix", path);
-    query.insert("delimiter", "/");
-    query.insert("max-keys", limit);
-    query
 }

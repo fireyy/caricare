@@ -1,5 +1,5 @@
-use cc_core::OssObject;
 use cc_core::Session;
+use cc_oss::object::Object as OssObject;
 
 #[derive(Clone)]
 pub enum ConfirmAction {

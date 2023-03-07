@@ -19,9 +19,10 @@ pub struct ListObjects {
     marker: String,
     max_keys: String,
     is_truncated: bool,
+    next_continuation_token: Option<String>,
 
-    objects: Vec<Object>,
-    common_prefixes: Vec<Object>,
+    pub objects: Vec<Object>,
+    pub common_prefixes: Vec<Object>,
 }
 
 impl ListObjects {
@@ -32,6 +33,7 @@ impl ListObjects {
         marker: String,
         max_keys: String,
         is_truncated: bool,
+        next_continuation_token: Option<String>,
 
         objects: Vec<Object>,
         common_prefixes: Vec<Object>,
@@ -43,6 +45,7 @@ impl ListObjects {
             marker,
             max_keys,
             is_truncated,
+            next_continuation_token,
 
             objects,
             common_prefixes,
@@ -73,12 +76,8 @@ impl ListObjects {
         self.is_truncated
     }
 
-    pub fn objects(&self) -> &Vec<Object> {
-        &self.objects
-    }
-
-    pub fn common_prefixes(&self) -> &Vec<Object> {
-        &self.common_prefixes
+    pub fn next_continuation_token(&self) -> &Option<String> {
+        &self.next_continuation_token
     }
 }
 
@@ -100,6 +99,7 @@ pub struct Object {
     owner_id: String,
     owner_display_name: String,
     obj_type: ObjectType,
+    selected: bool,
 }
 
 impl Object {
@@ -124,6 +124,7 @@ impl Object {
             owner_id,
             owner_display_name,
             obj_type: ObjectType::File,
+            selected: false,
         }
     }
 
@@ -165,6 +166,14 @@ impl Object {
 
     pub fn owner_display_name(&self) -> &str {
         &self.owner_display_name
+    }
+
+    pub fn selected(&self) -> bool {
+        self.selected
+    }
+
+    pub fn name(&self) -> String {
+        get_name_form_path(&self.key)
     }
 
     pub fn obj_type(&self) -> &ObjectType {
@@ -254,7 +263,7 @@ pub trait ObjectAPI {
 }
 
 #[async_trait]
-impl<'a> ObjectAPI for OSS<'a> {
+impl ObjectAPI for OSS {
     async fn list_object<S, H, R>(&self, headers: H, resources: R) -> Result<ListObjects, Error>
     where
         S: AsRef<str>,
@@ -267,6 +276,7 @@ impl<'a> ObjectAPI for OSS<'a> {
         let resp = self.http_client.get(host).headers(headers).send().await?;
 
         let xml_str = resp.text().await?;
+        tracing::debug!("XML: {}", xml_str);
         let mut result = Vec::new();
         let mut reader = Reader::from_str(xml_str.as_str());
         reader.trim_text(true);
@@ -286,6 +296,7 @@ impl<'a> ObjectAPI for OSS<'a> {
         let mut storage_class = String::new();
         let mut owner_id = String::new();
         let mut owner_display_name = String::new();
+        let mut next_continuation_token = None;
 
         let mut is_common_pre = false;
         let mut prefix_vec = Vec::new();
@@ -297,7 +308,6 @@ impl<'a> ObjectAPI for OSS<'a> {
                 Ok(Event::Start(ref e)) => match e.name().as_ref() {
                     b"CommonPrefixes" => {
                         is_common_pre = true;
-                        prefix_vec = Vec::new();
                     }
                     b"Name" => bucket_name = reader.read_text(e.name())?.to_string(),
                     b"Prefix" => {
@@ -315,6 +325,14 @@ impl<'a> ObjectAPI for OSS<'a> {
                     b"Delimiter" => delimiter = reader.read_text(e.name())?.to_string(),
                     b"IsTruncated" => {
                         is_truncated = reader.read_text(e.name())?.to_string() == "true"
+                    }
+                    b"NextContinuationToken" => {
+                        let nc_token = reader.read_text(e.name())?.to_string();
+                        next_continuation_token = if nc_token.len() > 0 {
+                            Some(nc_token)
+                        } else {
+                            None
+                        };
                     }
                     b"Contents" => {
                         // do nothing
@@ -336,7 +354,6 @@ impl<'a> ObjectAPI for OSS<'a> {
 
                 Ok(Event::End(ref e)) => match e.name().as_ref() {
                     b"CommonPrefixes" => {
-                        // self.set_common_prefix(&prefix_vec)?;
                         is_common_pre = false;
                     }
                     b"Contents" => {
@@ -363,6 +380,7 @@ impl<'a> ObjectAPI for OSS<'a> {
                         marker,
                         max_keys,
                         is_truncated,
+                        next_continuation_token,
                         result,
                         prefix_vec,
                     );
@@ -510,4 +528,12 @@ impl<'a> ObjectAPI for OSS<'a> {
             }))
         }
     }
+}
+
+fn get_name_form_path(path: &str) -> String {
+    path.split('/')
+        .filter(|k| !k.is_empty())
+        .last()
+        .unwrap_or("")
+        .to_string()
 }

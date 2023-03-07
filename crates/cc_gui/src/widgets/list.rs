@@ -2,7 +2,7 @@ use super::item_ui;
 use crate::state::{NavgatorType, State, Update};
 use crate::widgets::confirm::ConfirmAction;
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
-use cc_core::OssObjectType;
+use cc_oss::object::ObjectType;
 
 pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
     egui::Grid::new(format!("list"))
@@ -15,7 +15,7 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                         ui.set_width(60.);
                         if ui.button("\u{1f5d1}").on_hover_text("Delete").clicked() {
                             state.confirm.show(
-                                format!("Do you confirm to delete this item: {}?", data.path()),
+                                format!("Do you confirm to delete this item: {}?", data.key()),
                                 ConfirmAction::RemoveFile(data.clone()),
                             );
                         }
@@ -33,7 +33,7 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                         ui.label(data.size_string());
                     });
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                        ui.checkbox(&mut data.selected, "");
+                        ui.checkbox(&mut data.selected(), "");
                         ui.vertical(|ui| {
                             if ui
                                 .add(
@@ -45,17 +45,17 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                                 .on_hover_text(data.name())
                                 .clicked()
                             {
-                                match data.obj_type {
-                                    OssObjectType::File => {
+                                match data.obj_type() {
+                                    ObjectType::File => {
                                         state.current_img = data.clone();
                                         state.is_preview = true;
                                         ui.ctx().request_repaint();
                                     }
-                                    OssObjectType::Folder => {
+                                    ObjectType::Folder => {
                                         state
                                             .update_tx
                                             .send(Update::Navgator(NavgatorType::New(
-                                                data.path.clone(),
+                                                data.key().to_string(),
                                             )))
                                             .unwrap();
                                     }
@@ -87,21 +87,21 @@ pub fn thumb_ui(
             for i in row_range {
                 for j in 0..num_cols {
                     if let Some(d) = state.list.get(j + i * num_cols) {
-                        let url = state.get_oss_url(&d.path);
+                        let url = state.get_oss_url(&d.key());
                         let data = d.clone();
                         let resp = item_ui(ui, &data, url.clone(), &mut state.images);
                         if resp.on_hover_text(d.name()).clicked() {
-                            match data.obj_type {
-                                OssObjectType::File => {
+                            match data.obj_type() {
+                                ObjectType::File => {
                                     state.current_img = data;
                                     state.is_preview = true;
                                     ui.ctx().request_repaint();
                                 }
-                                OssObjectType::Folder => {
+                                ObjectType::Folder => {
                                     state
                                         .update_tx
                                         .send(Update::Navgator(NavgatorType::New(
-                                            data.path.clone(),
+                                            data.key().to_string(),
                                         )))
                                         .unwrap();
                                 }

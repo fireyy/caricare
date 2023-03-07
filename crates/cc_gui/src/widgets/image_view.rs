@@ -39,7 +39,7 @@ fn zoom_action(win_size: egui::Vec2, state: &mut State, zoom_type: ZoomType) {
 }
 
 pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
-    let url = state.get_oss_url(&state.current_img.path);
+    let url = state.get_oss_url(state.current_img.key());
 
     if url.is_empty() {
         return;

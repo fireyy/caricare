@@ -1,4 +1,3 @@
-use crate::error::CoreError;
 use crate::regex;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};

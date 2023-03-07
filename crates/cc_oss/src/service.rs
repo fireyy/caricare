@@ -140,7 +140,7 @@ pub trait ServiceAPI {
 }
 
 #[async_trait]
-impl<'a> ServiceAPI for OSS<'a> {
+impl ServiceAPI for OSS {
     async fn list_bucket<S, R>(&self, resources: R) -> Result<ListBuckets, Error>
     where
         S: AsRef<str> + Send,
