@@ -31,13 +31,17 @@ impl eframe::App for App {
                 Route::List => main_page(ctx, &mut self.state, frame),
                 _ => {}
             },
-            Status::Busy(_) => {
-                egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.centered_and_justified(|ui| {
-                        ui.spinner();
+            Status::Busy(ref mut route) => match route {
+                Route::Auth => {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        ui.centered_and_justified(|ui| {
+                            ui.spinner();
+                        });
                     });
-                });
-            }
+                }
+                Route::List => main_page(ctx, &mut self.state, frame),
+                _ => {}
+            },
         };
     }
 }

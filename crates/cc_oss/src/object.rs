@@ -99,7 +99,7 @@ pub struct Object {
     owner_id: String,
     owner_display_name: String,
     obj_type: ObjectType,
-    selected: bool,
+    pub selected: bool,
 }
 
 impl Object {
@@ -166,10 +166,6 @@ impl Object {
 
     pub fn owner_display_name(&self) -> &str {
         &self.owner_display_name
-    }
-
-    pub fn selected(&self) -> bool {
-        self.selected
     }
 
     pub fn name(&self) -> String {

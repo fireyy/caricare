@@ -1,7 +1,8 @@
 use crate::state::State;
 
 pub fn action_bar_ui(ctx: &egui::Context, state: &mut State) {
-    let has_selected = state.list.iter().find(|x| x.selected());
+    let selected: Vec<&cc_oss::prelude::Object> =
+        state.list.iter().filter(|x| x.selected).collect();
     let frame = egui::Frame {
         fill: ctx.style().visuals.panel_fill,
         ..state.cc_ui.bottom_panel_frame()
@@ -10,21 +11,9 @@ pub fn action_bar_ui(ctx: &egui::Context, state: &mut State) {
         .default_height(50.0)
         .resizable(false)
         .frame(frame)
-        .show_animated(ctx, has_selected.is_some(), |ui| {
+        .show_animated(ctx, !selected.is_empty(), |ui| {
             ui.horizontal(|ui| {
-                ui.label("Action:");
-                if ui.button("Copy").clicked() {
-                    //
-                }
-                if ui.button("Move").clicked() {
-                    //
-                }
-                if ui.button("Rename").clicked() {
-                    //
-                }
-                // if ui.button("Delete").clicked() {
-                //     //
-                // }
+                ui.label(format!("Selected: {}", selected.len()));
             });
         });
 }

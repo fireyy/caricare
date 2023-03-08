@@ -1,4 +1,4 @@
-use crate::state::State;
+use crate::state::{State, Status};
 use crate::widgets::{
     list::{list_ui, thumb_ui},
     status_bar_ui, top_bar_ui,
@@ -12,12 +12,19 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
         egui::Frame::none()
             .inner_margin(egui::style::Margin::same(0.0))
             .show(ui, |ui| {
+                if let Status::Busy(_) = state.status {
+                    ui.centered_and_justified(|ui| {
+                        ui.spinner();
+                    });
+                    return;
+                }
                 if let Some(err) = &state.err {
                     ui.centered_and_justified(|ui| {
                         ui.label(egui::RichText::new(err).color(egui::Color32::RED))
                     });
                     return;
                 }
+                let list_len = state.list.len();
                 if state.list.is_empty() {
                     ui.centered_and_justified(|ui| ui.heading("Nothing Here."));
                     return;
@@ -25,14 +32,14 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
                 let (num_cols, num_rows, col_width, row_height) = match state.setting.show_type {
                     ShowType::List => (
                         1,
-                        state.list.len(),
+                        list_len,
                         1.0,
                         ui.text_style_height(&egui::TextStyle::Body),
                     ),
                     ShowType::Thumb => {
                         let w = ui.ctx().input(|i| i.screen_rect().size());
                         let num_cols = (w.x / THUMB_LIST_WIDTH) as usize;
-                        let num_rows = (state.list.len() as f32 / num_cols as f32).ceil() as usize;
+                        let num_rows = (list_len as f32 / num_cols as f32).ceil() as usize;
                         let col_width = w.x / (num_cols as f32);
 
                         (num_cols, num_rows, col_width, THUMB_LIST_HEIGHT)

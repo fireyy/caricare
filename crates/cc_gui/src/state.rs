@@ -1,6 +1,5 @@
 use crate::theme;
 use crate::widgets::{
-    action_bar_ui,
     confirm::{Confirm, ConfirmAction},
     image_view_ui, log_panel_ui,
 };
@@ -48,6 +47,7 @@ pub enum Update {
     List(Result<ListObjects, OssError>),
     Navgator(NavgatorType),
     Deleted(Result<(), OssError>),
+    CreateFolder(Result<(), OssError>),
 }
 
 pub struct State {
@@ -78,6 +78,7 @@ pub struct State {
     pub status: Status,
     pub toasts: Toasts,
     pub cc_ui: theme::CCUi,
+    pub filter_str: String,
 }
 
 impl State {
@@ -149,6 +150,7 @@ impl State {
             status,
             toasts: Toasts::new(),
             cc_ui,
+            filter_str: String::new(),
         };
 
         this.next_query = Some(this.build_query(None));
@@ -217,6 +219,16 @@ impl State {
                         self.err = Some(err.to_string());
                     }
                 },
+                Update::CreateFolder(result) => match result {
+                    Ok(_) => {
+                        //
+                        self.toasts.success("Create Successed");
+                    }
+                    Err(err) => {
+                        self.status = Status::Idle(Route::List);
+                        self.err = Some(err.to_string());
+                    }
+                },
             }
         }
 
@@ -244,7 +256,6 @@ impl State {
         if self.oss.is_some() {
             image_view_ui(ctx, self);
             log_panel_ui(ctx, self);
-            action_bar_ui(ctx, self);
         }
 
         self.toasts.show(ctx);
@@ -290,6 +301,22 @@ impl State {
             tokio::spawn(async move {
                 let res = oss.delete_object(file).await;
                 update_tx.send(Update::Deleted(res)).unwrap();
+                ctx.request_repaint();
+            });
+        });
+    }
+
+    pub fn create_folder(&mut self, ctx: &egui::Context, name: String) {
+        self.status = Status::Busy(Route::List);
+
+        let update_tx = self.update_tx.clone();
+        let ctx = ctx.clone();
+        let oss = self.oss().clone();
+
+        cc_core::runtime::spawn(async move {
+            tokio::spawn(async move {
+                let res = oss.create_object(name).await;
+                update_tx.send(Update::CreateFolder(res)).unwrap();
                 ctx.request_repaint();
             });
         });
@@ -346,10 +373,17 @@ impl State {
         self.get_list(ctx);
     }
 
+    pub fn filter(&mut self, ctx: &egui::Context) {
+        self.refresh(ctx);
+    }
+
     fn build_query(&self, next_token: Option<String>) -> Query {
         let mut path = self.current_path.clone();
         if !path.ends_with('/') && !path.is_empty() {
             path.push_str("/");
+        }
+        if !self.filter_str.is_empty() {
+            path.push_str(&self.filter_str);
         }
         let mut query = Query::new();
         query.insert("prefix", path);

@@ -63,17 +63,8 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                             }
                         });
 
-                        if ui
-                            .button("\u{2795}")
-                            .on_hover_text("Upload file...")
-                            .clicked()
-                        {
-                            if let Some(paths) = rfd::FileDialog::new()
-                                .add_filter("image", &SUPPORT_EXTENSIONS)
-                                .pick_files()
-                            {
-                                state.picked_path = paths;
-                            }
+                        if ui.button("\u{1f310}").on_hover_text("Home").clicked() {
+                            //TODO: Home action
                         }
                         ui.horizontal(|ui| {
                             ui.set_width(25.0);
@@ -82,7 +73,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                 && !state.loading_more;
 
                             ui.add_enabled_ui(enabled, |ui| {
-                                if ui.button("\u{1f503}").clicked() {
+                                if ui.button("\u{1f503}").on_hover_text("Refresh").clicked() {
                                     state.refresh(ui.ctx());
                                 }
                             });
@@ -135,6 +126,44 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                 }
                             });
                             location_bar_ui(ui, state);
+                        });
+                    });
+                    ui.horizontal(|ui| {
+                        // upload button
+                        if ui.button("\u{1f5c1} Upload").clicked() {
+                            if let Some(paths) = rfd::FileDialog::new()
+                                .add_filter("image", &SUPPORT_EXTENSIONS)
+                                .pick_files()
+                            {
+                                state.picked_path = paths;
+                            }
+                        }
+                        // create folder button
+                        if ui.button("\u{2795} Create Folder").clicked() {
+                            //
+                        }
+                        ui.separator();
+                        let has_selected = state.list.iter().find(|x| x.selected);
+                        ui.add_enabled_ui(has_selected.is_some(), |ui| {
+                            if ui.button("\u{1f5d0} Copy").clicked() {
+                                //TODO: Copy action
+                            }
+                            if ui.button("\u{1f5db} Rename").clicked() {
+                                //TODO: Rename action
+                            }
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                            let response = ui.add_sized(
+                                ui.available_size() - [100.0, 0.0].into(),
+                                egui::TextEdit::singleline(&mut state.filter_str)
+                                    .hint_text("Filter with file name")
+                                    .lock_focus(true),
+                            );
+                            response.request_focus();
+
+                            if response.changed() {
+                                state.filter(ctx);
+                            }
                         });
                     });
                 });

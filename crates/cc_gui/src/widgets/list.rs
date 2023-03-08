@@ -33,7 +33,7 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                         ui.label(data.size_string());
                     });
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                        ui.checkbox(&mut data.selected(), "");
+                        ui.checkbox(&mut data.selected, "");
                         ui.vertical(|ui| {
                             if ui
                                 .add(
@@ -93,7 +93,7 @@ pub fn thumb_ui(
                         if resp.on_hover_text(d.name()).clicked() {
                             match data.obj_type() {
                                 ObjectType::File => {
-                                    state.current_img = data;
+                                    state.current_img = data.clone();
                                     state.is_preview = true;
                                     ui.ctx().request_repaint();
                                 }
