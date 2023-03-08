@@ -88,13 +88,7 @@ impl State {
             Some(session) => session,
             None => Session::default(),
         };
-        let mut sessions = vec![];
-        match store::get_all_session() {
-            Ok(list) => {
-                sessions = list;
-            }
-            Err(err) => tracing::debug!("{:?}", err),
-        }
+
         let mut oss = None;
 
         let (update_tx, update_rx) = mpsc::sync_channel(1);
@@ -144,7 +138,7 @@ impl State {
             navigator,
             confirm: Confirm::new(confirm_tx),
             session,
-            sessions,
+            sessions: vec![],
             dropped_files: vec![],
             picked_path: vec![],
             status,
@@ -154,6 +148,7 @@ impl State {
         };
 
         this.next_query = Some(this.build_query(None));
+        this.sessions = this.load_all_session();
 
         this
     }
@@ -404,6 +399,7 @@ impl State {
         self.oss = Some(client);
         self.refresh(ctx);
         self.setting.auto_login = true;
+        self.sessions = self.load_all_session();
         Ok(())
     }
 
@@ -420,6 +416,7 @@ impl State {
                 }
                 ConfirmAction::RemoveSession(session) => {
                     store::delete_session_by_name(&session.key_id);
+                    self.sessions = self.load_all_session();
                 }
                 ConfirmAction::RemoveFile(obj) => {
                     self.delete_object(ctx, obj);
@@ -430,5 +427,17 @@ impl State {
 
     pub fn confirm(&mut self, message: impl Into<String>, action: ConfirmAction) {
         self.confirm.show(message, action);
+    }
+
+    pub fn load_all_session(&mut self) -> Vec<Session> {
+        let mut sessions = vec![];
+        match store::get_all_session() {
+            Ok(list) => {
+                sessions = list;
+            }
+            Err(err) => tracing::debug!("{:?}", err),
+        }
+
+        sessions
     }
 }
