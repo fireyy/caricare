@@ -6,12 +6,21 @@ pub enum ConfirmAction {
     Logout,
     RemoveSession(Session),
     RemoveFile(OssObject),
+    CreateFolder(String),
+}
+
+#[derive(Clone, PartialEq)]
+pub enum ConfirmType {
+    Message,
+    Prompt,
 }
 
 pub struct Confirm {
     is_show: bool,
     title: String,
     message: String,
+    c_type: ConfirmType,
+    prompt: String,
     tx: std::sync::mpsc::SyncSender<ConfirmAction>,
     action: Option<ConfirmAction>,
 }
@@ -22,6 +31,8 @@ impl Confirm {
             is_show: false,
             title: "Confirm".into(),
             message: "".into(),
+            c_type: ConfirmType::Message,
+            prompt: "".into(),
             tx,
             action: None,
         }
@@ -55,12 +66,24 @@ impl Confirm {
                         .inner_margin(egui::vec2(10., 10.))
                         .show(ui, |ui| {
                             ui.label(&self.message);
+                            if self.c_type == ConfirmType::Prompt {
+                                ui.text_edit_singleline(&mut self.prompt);
+                            }
                             ui.add_space(10.);
                             ui.horizontal(|ui| {
                                 if ui.button("Ok").clicked() {
                                     self.close();
                                     if let Some(action) = &self.action {
-                                        self.tx.send(action.clone()).unwrap();
+                                        let mut final_action = action.clone();
+                                        match action {
+                                            ConfirmAction::CreateFolder(_) => {
+                                                final_action = ConfirmAction::CreateFolder(
+                                                    self.prompt.clone(),
+                                                );
+                                            }
+                                            _ => {}
+                                        }
+                                        self.tx.send(final_action).unwrap()
                                     }
                                 }
                                 if ui.button("Cancel").clicked() {
@@ -77,6 +100,14 @@ impl Confirm {
     }
 
     pub fn show(&mut self, message: impl Into<String>, action: ConfirmAction) {
+        self.c_type = ConfirmType::Message;
+        self.message = message.into();
+        self.action = Some(action);
+        self.is_show = true;
+    }
+
+    pub fn prompt(&mut self, message: impl Into<String>, action: ConfirmAction) {
+        self.c_type = ConfirmType::Prompt;
         self.message = message.into();
         self.action = Some(action);
         self.is_show = true;

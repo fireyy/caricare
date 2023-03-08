@@ -208,6 +208,7 @@ impl State {
                     Ok(_) => {
                         //
                         self.toasts.success("Delete Successed");
+                        self.refresh(ctx);
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -218,6 +219,7 @@ impl State {
                     Ok(_) => {
                         //
                         self.toasts.success("Create Successed");
+                        self.refresh(ctx);
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -233,7 +235,7 @@ impl State {
             self.dropped_files = vec![];
             for file in dropped_files {
                 if let Some(path) = &file.path {
-                    if SUPPORT_EXTENSIONS.contains(&get_extension(path.clone()).as_str()) {
+                    if SUPPORT_EXTENSIONS.contains(&get_extension(&path).as_str()) {
                         files.push(path.clone());
                     }
                 }
@@ -275,10 +277,11 @@ impl State {
         let update_tx = self.update_tx.clone();
         let ctx = ctx.clone();
         let oss = self.oss().clone();
+        let dest = self.current_path.clone();
 
         cc_core::runtime::spawn(async move {
             tokio::spawn(async move {
-                let res = oss.put_multi(picked_path).await;
+                let res = oss.put_multi(picked_path, dest).await;
                 update_tx.send(Update::Uploaded(res)).unwrap();
                 ctx.request_repaint();
             });
@@ -307,10 +310,11 @@ impl State {
         let update_tx = self.update_tx.clone();
         let ctx = ctx.clone();
         let oss = self.oss().clone();
+        let name = format!("{}{}", self.current_path, name);
 
         cc_core::runtime::spawn(async move {
             tokio::spawn(async move {
-                let res = oss.create_object(name).await;
+                let res = oss.create_folder(name).await;
                 update_tx.send(Update::CreateFolder(res)).unwrap();
                 ctx.request_repaint();
             });
@@ -390,7 +394,7 @@ impl State {
         query
     }
 
-    pub fn save_auth(&mut self, ctx: &egui::Context) -> Result<(), CoreError> {
+    pub fn login(&mut self, ctx: &egui::Context) -> Result<(), CoreError> {
         let client = OssClient::new(&self.session)?;
         let _ = store::put_session(&self.session)?;
         let current_path = client.get_path().to_string();
@@ -421,12 +425,11 @@ impl State {
                 ConfirmAction::RemoveFile(obj) => {
                     self.delete_object(ctx, obj);
                 }
+                ConfirmAction::CreateFolder(name) => {
+                    self.create_folder(ctx, name);
+                }
             }
         }
-    }
-
-    pub fn confirm(&mut self, message: impl Into<String>, action: ConfirmAction) {
-        self.confirm.show(message, action);
     }
 
     pub fn load_all_session(&mut self) -> Vec<Session> {

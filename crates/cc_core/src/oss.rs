@@ -1,10 +1,9 @@
 use crate::log::LogItem;
-use crate::util::get_extension;
+use crate::util::get_name;
 use crate::{CoreError, Session};
 use cc_oss::object::Object as OssObject;
 use cc_oss::prelude::*;
 use cc_oss::{errors::Error, query::Query};
-use md5;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -72,21 +71,10 @@ impl OssClient {
         self.client.bucket()
     }
 
-    pub async fn put(&self, path: PathBuf) -> Result<(), Error> {
-        // let path = PathBuf::from(path);
-        let path_clone = path.clone();
-        let bucket_path = self.path.clone();
-        let ext = get_extension(path_clone);
+    pub async fn put(&self, path: PathBuf, dest: &str) -> Result<(), Error> {
+        let name = get_name(&path);
         let file_content = std::fs::read(path).unwrap();
-        let key = format!("{}/{:x}.{}", bucket_path, md5::compute(&file_content), ext);
-        // let get_content_type = |content: &Vec<u8>| match infer::get(content) {
-        //     Some(con) => Some(con.mime_type()),
-        //     None => None,
-        // };
-        // let content_type = match infer::get(&file_content) {
-        //     Some(con) => Some(con.mime_type()),
-        //     None => None,
-        // };
+        let key = format!("{}{}", dest, name);
         let content_length = file_content.len().to_string();
         let mut headers = HashMap::new();
         headers.insert("content-length", content_length.as_str());
@@ -100,10 +88,14 @@ impl OssClient {
         result
     }
 
-    pub async fn put_multi(&self, paths: Vec<PathBuf>) -> Result<Vec<LogItem>, Error> {
+    pub async fn put_multi(
+        &self,
+        paths: Vec<PathBuf>,
+        dest: String,
+    ) -> Result<Vec<LogItem>, Error> {
         let mut results = vec![];
         for path in paths {
-            match self.put(path).await {
+            match self.put(path, &dest).await {
                 Ok(_) => results.push(LogItem::upload().with_success("upload success".into())),
                 Err(err) => results.push(LogItem::upload().with_error(err.to_string())),
             }
@@ -124,7 +116,13 @@ impl OssClient {
         res
     }
 
-    pub async fn create_object(self, path: String) -> Result<(), Error> {
+    pub async fn create_folder(self, path: String) -> Result<(), Error> {
+        let path = if path.ends_with("/") {
+            path
+        } else {
+            format!("{path}/")
+        };
+        tracing::debug!("Create folder: {}", path);
         let result = self
             .client
             .put_object(&[0], path, None::<HashMap<&str, &str>>, None)

@@ -55,7 +55,9 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                         .on_hover_text("Logout")
                         .clicked()
                     {
-                        state.confirm("Do you confirm to logout?", ConfirmAction::Logout);
+                        state
+                            .confirm
+                            .show("Do you confirm to logout?", ConfirmAction::Logout);
                     }
                     if ui
                         .button(egui::RichText::new("\u{1f4ac}").color(color))

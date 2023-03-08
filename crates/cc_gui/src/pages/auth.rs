@@ -31,8 +31,8 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
 
                 ui.add_space(20.0);
 
-                if ui.button("Save").clicked() {
-                    match state.save_auth(ui.ctx()) {
+                if ui.button("Login").clicked() {
+                    match state.login(ui.ctx()) {
                         Ok(_) => {
                             state
                                 .toasts
@@ -102,7 +102,7 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                                     state.session = d.clone();
                                 }
                                 if ui.button("Remove").clicked() {
-                                    state.confirm(
+                                    state.confirm.show(
                                         "Do you confirm to remove this item?",
                                         ConfirmAction::RemoveSession(d.clone()),
                                     )

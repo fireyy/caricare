@@ -430,6 +430,8 @@ impl ObjectAPI for OSS {
         let (host, headers) =
             self.build_request(RequestType::Put, object_name, headers, resources)?;
 
+        tracing::debug!("Host: {}, Headers: {:?}", host, headers);
+
         let resp = self
             .http_client
             .put(&host)
@@ -441,7 +443,7 @@ impl ObjectAPI for OSS {
         if resp.status().is_success() {
             Ok(())
         } else {
-            Err(Error::Object(ObjectError::DeleteError {
+            Err(Error::Object(ObjectError::PutError {
                 msg: format!(
                     "can not put object, status code, status code: {}",
                     resp.status()
@@ -519,7 +521,7 @@ impl ObjectAPI for OSS {
         if resp.status().is_success() {
             Ok(ObjectMeta::from_header_map(resp.headers())?)
         } else {
-            Err(Error::Object(ObjectError::DeleteError {
+            Err(Error::Object(ObjectError::HeadError {
                 msg: format!("can not head object, status code: {}", resp.status()).into(),
             }))
         }

@@ -1,21 +1,12 @@
+use super::confirm::ConfirmAction;
 use super::location_bar_ui;
 use crate::state::{NavgatorType, Route, State, Status, Update};
 use crate::SUPPORT_EXTENSIONS;
-use cc_core::log::LogItem;
 use cc_core::ShowType;
 
 pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {
     let native_pixels_per_point = frame.info().native_pixels_per_point;
-    let fullscreen = {
-        #[cfg(target_arch = "wasm32")]
-        {
-            false
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            frame.info().window_info.fullscreen
-        }
-    };
+    let fullscreen = frame.info().window_info.fullscreen;
     let top_bar_style = state
         .cc_ui
         .top_bar_style(native_pixels_per_point, fullscreen);
@@ -101,9 +92,6 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     .clicked()
                                 {
                                     state.scroll_top = true;
-                                    state
-                                        .logs
-                                        .push(LogItem::unknow().with_info("dooooooo".into()));
                                 }
                                 if ui
                                     .selectable_value(
@@ -120,9 +108,6 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     .clicked()
                                 {
                                     state.scroll_top = true;
-                                    state.logs.push(
-                                        LogItem::unknow().with_success("fffffffffffff".into()),
-                                    );
                                 }
                             });
                             location_bar_ui(ui, state);
@@ -140,7 +125,10 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         }
                         // create folder button
                         if ui.button("\u{2795} Create Folder").clicked() {
-                            //
+                            state.confirm.prompt(
+                                "Please enter the folder name:",
+                                ConfirmAction::CreateFolder("".into()),
+                            );
                         }
                         ui.separator();
                         let has_selected = state.list.iter().find(|x| x.selected);
@@ -157,9 +145,12 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                 ui.available_size() - [100.0, 0.0].into(),
                                 egui::TextEdit::singleline(&mut state.filter_str)
                                     .hint_text("Filter with file name")
-                                    .lock_focus(true),
+                                    .lock_focus(false),
                             );
-                            response.request_focus();
+                            //TODO: use CommandPalette
+                            if !state.filter_str.is_empty() {
+                                response.request_focus();
+                            }
 
                             if response.changed() {
                                 state.filter(ctx);

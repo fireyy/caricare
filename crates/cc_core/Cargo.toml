@@ -12,7 +12,6 @@ edition = "2021"
 cc_oss = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = "0.3.0"
-md5 = "0.7"
 infer = "0.11.0"
 anyhow = "1.0.66"
 flume = "0.10.14"
