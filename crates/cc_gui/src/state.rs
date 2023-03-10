@@ -48,6 +48,7 @@ pub enum Update {
     Navgator(NavgatorType),
     Deleted(Result<(), OssError>),
     CreateFolder(Result<(), OssError>),
+    ViewObject(String),
 }
 
 pub struct State {
@@ -229,6 +230,9 @@ impl State {
                         self.err = Some(err.to_string());
                     }
                 },
+                Update::ViewObject(name) => {
+                    self.get_object(ctx, name);
+                }
             }
         }
 
@@ -336,6 +340,23 @@ impl State {
             tokio::spawn(async move {
                 let res = oss.create_folder(name).await;
                 update_tx.send(Update::CreateFolder(res)).unwrap();
+                ctx.request_repaint();
+            });
+        });
+    }
+
+    pub fn get_object(&mut self, ctx: &egui::Context, name: String) {
+        // self.status = Status::Busy(Route::List);
+
+        // let update_tx = self.update_tx.clone();
+        let ctx = ctx.clone();
+        let oss = self.oss().clone();
+        // let name = format!("{}{}", self.current_path, name);
+
+        cc_core::runtime::spawn(async move {
+            tokio::spawn(async move {
+                let _res = oss.get_object(name).await;
+                // update_tx.send(Update::CreateFolder(res)).unwrap();
                 ctx.request_repaint();
             });
         });

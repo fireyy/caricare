@@ -4,12 +4,13 @@ use crate::{CoreError, Session};
 use cc_oss::object::Object as OssObject;
 use cc_oss::prelude::*;
 use cc_oss::{errors::Error, query::Query};
+use oss_sdk::Client;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Default, Clone)]
 pub struct OssClient {
-    // session: Session,
+    session: Session,
     path: String,
     url: String,
     client: OSS,
@@ -32,7 +33,7 @@ impl OssClient {
             path,
             url,
             client,
-            // session: session.clone(),
+            session: session.clone(),
         })
     }
 
@@ -170,5 +171,19 @@ impl OssClient {
             .await;
         tracing::info!("Result: {:?}", result);
         result
+    }
+
+    pub async fn get_object(self, object: impl AsRef<str>) {
+        let cli = Client::builder()
+            .endpoint(self.session.endpoint)
+            .access_key(self.session.key_id)
+            .access_secret(self.session.key_secret)
+            .build()
+            .unwrap();
+
+        let bucket = cli.bucket(self.session.bucket).unwrap();
+        let result = bucket.get_object(object).await;
+
+        tracing::debug!("Result: {:?}", result);
     }
 }

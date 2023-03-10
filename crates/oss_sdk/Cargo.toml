@@ -1,22 +1,22 @@
 [package]
-name = "cc_oss"
+name = "oss_sdk"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+thiserror = "1.0"
+anyhow = "1.0"
 reqwest = { version = "0.11.13", default-features = false }
-base64 = "0.20"
-chrono = "0.4.20"
-log = "0.4.17"
 quick-xml = "0.27"
-derive_more = "0.99.5"
-bytes = "1.0"
-async-trait = "0.1.53"
-httpdate = "1.0.2"
-hmac = "0.12"
-sha1 = "0.10"
 tracing = { workspace = true }
 bytesize = "1.1.0"
 reqsign = { version = "0.8.3", features = ["reqwest_request"] }
+once_cell = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = "0.4.20"
+serde_urlencoded = "0.7"
+md5 = "0.7.0"
+base64 = "0.20"

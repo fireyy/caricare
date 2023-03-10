@@ -10,6 +10,7 @@ edition = "2021"
 # aliyun-oss-client = { git = "https://github.com/tu6ge/oss-rs.git", rev = "84a89cd" }
 # aliyun-oss-client = { path = "../../oss-rs" }
 cc_oss = { workspace = true }
+oss_sdk = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = "0.3.0"
 infer = "0.11.0"
@@ -21,7 +22,7 @@ reqwest = { version = "0.11.12", features = ["json"] }
 tokio = { version = "1.21.2", features = ["rt-multi-thread"] }
 tokio-stream = "0.1.11"
 egui_extras = { version = "0.21.0", features = ["image", "svg"] }
-once_cell = "1.15.0"
+once_cell = { workspace = true }
 bytesize = "1.1.0"
 regex = "1.7.1"
 serde = { workspace = true }

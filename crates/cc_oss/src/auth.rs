@@ -8,6 +8,7 @@ type HmacSha1 = Hmac<sha1::Sha1>;
 
 use super::oss::OSS;
 
+//TODO: use https://github.com/Xuanwo/reqsign
 pub trait Auth {
     fn oss_sign(
         &self,

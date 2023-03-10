@@ -144,9 +144,10 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         }
                         ui.separator();
                         ui.add_enabled_ui(state.selected_item > 0, |ui| {
-                            if ui.button("\u{1f5d0} Copy").clicked() {
-                                //TODO: Copy action
-                            }
+                            //TODO: Copy action
+                            // if ui.button("\u{1f5d0} Copy").clicked() {
+                            //     //
+                            // }
                             if ui.button("\u{1f5d1} Delete").clicked() {
                                 state.confirm.show(
                                     "Do you confirm to delete selected items?",
@@ -154,11 +155,12 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                 )
                             }
                         });
-                        ui.add_enabled_ui(state.selected_item == 1, |ui| {
-                            if ui.button("\u{270f} Rename").clicked() {
-                                //TODO: Rename action
-                            }
-                        });
+                        //TODO: Rename action
+                        // ui.add_enabled_ui(state.selected_item == 1, |ui| {
+                        //     if ui.button("\u{270f} Rename").clicked() {
+                        //         //
+                        //     }
+                        // });
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             let response = ui.add_sized(
                                 ui.available_size() - [100.0, 0.0].into(),
