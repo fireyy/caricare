@@ -19,10 +19,8 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
                     return;
                 }
                 if let Some(err) = &state.err {
-                    ui.centered_and_justified(|ui| {
-                        ui.label(egui::RichText::new(err).color(egui::Color32::RED))
-                    });
-                    return;
+                    state.toasts.error(err);
+                    state.err = None;
                 }
                 let list_len = state.list.len();
                 if state.list.is_empty() {

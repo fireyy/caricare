@@ -19,10 +19,11 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                     ui.add(egui::Spinner::new().size(12.0));
                 }
 
-                let selected: Vec<&cc_oss::prelude::Object> =
-                    state.list.iter().filter(|x| x.selected).collect();
-
-                ui.label(format!("Selected: {}/{}", selected.len(), state.list.len()));
+                ui.label(format!(
+                    "Selected: {}/{}",
+                    state.selected_item,
+                    state.list.len()
+                ));
 
                 if state.next_query.is_none() && !state.loading_more {
                     // ui.label("No More Data.");

@@ -253,6 +253,17 @@ pub trait ObjectAPI {
     where
         S: AsRef<str> + Send;
 
+    async fn delete_multi_object<S, H, R>(
+        &self,
+        objects: String,
+        headers: H,
+        resources: R,
+    ) -> Result<(), Error>
+    where
+        S: AsRef<str> + Send,
+        H: Into<Option<HashMap<S, S>>> + Send,
+        R: Into<Option<HashMap<S, Option<S>>>> + Send;
+
     async fn head_object<S>(&self, object_name: S) -> Result<ObjectMeta, Error>
     where
         S: AsRef<str> + Send;
@@ -268,6 +279,8 @@ impl ObjectAPI for OSS {
     {
         let (host, headers) =
             self.build_request(RequestType::Get, String::new(), headers, resources)?;
+
+        tracing::debug!("List object: {host}, {:?}", headers);
 
         let resp = self.http_client.get(host).headers(headers).send().await?;
 
@@ -485,7 +498,7 @@ impl ObjectAPI for OSS {
     where
         S: AsRef<str> + Send,
     {
-        let headers = HashMap::<String, String>::new();
+        let headers = HashMap::<&str, &str>::new();
         let (host, headers) =
             self.build_request(RequestType::Delete, object_name, Some(headers), None)?;
 
@@ -503,6 +516,42 @@ impl ObjectAPI for OSS {
                 msg: format!("can not delete object, status code: {}", resp.status()).into(),
             }))
         }
+    }
+
+    async fn delete_multi_object<S, H, R>(
+        &self,
+        objects: String,
+        headers: H,
+        resources: R,
+    ) -> Result<(), Error>
+    where
+        S: AsRef<str> + Send,
+        H: Into<Option<HashMap<S, S>>> + Send,
+        R: Into<Option<HashMap<S, Option<S>>>> + Send,
+    {
+        let (host, headers) = self.build_request(RequestType::Post, "", headers, resources)?;
+
+        tracing::debug!("Delete Multi: {host}, {:?}, {:?}", headers, objects);
+
+        let resp = self
+            .http_client
+            .post(&host)
+            .headers(headers)
+            .body(objects)
+            .send()
+            .await?;
+
+        let text = resp.text().await?;
+        tracing::debug!("Result: {}", text);
+
+        Ok(())
+        // if resp.status().is_success() {
+        //     Ok(())
+        // } else {
+        //     Err(Error::Object(ObjectError::DeleteError {
+        //         msg: format!("can not delete object, status code: {}", resp.status()).into(),
+        //     }))
+        // }
     }
 
     async fn head_object<S>(&self, object_name: S) -> Result<ObjectMeta, Error>

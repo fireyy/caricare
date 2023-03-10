@@ -137,4 +137,38 @@ impl OssClient {
         tracing::info!("Result: {:?}", result);
         result
     }
+
+    pub async fn delete_multi_object(self, obj: Vec<OssObject>) -> Result<(), Error> {
+        let mut query = HashMap::new();
+        query.insert("delete", None);
+
+        let mut xml = vec![
+            r#"<?xml version="1.0" encoding="UTF-8"?>"#.to_string(),
+            "\n<Delete><Quiet>false</Quiet>".to_string(),
+        ];
+        for o in obj.iter() {
+            xml.push(format!("<Object><Key>{}</Key></Object>", o.key()));
+        }
+        xml.push("</Delete>".to_string());
+        let result = xml.join("");
+        let result_clone = result.clone();
+
+        let mut headers: HashMap<&str, &str> = HashMap::new();
+        let len = result.len().to_string().to_owned();
+        headers.insert("content-length", &len);
+
+        let md5_digest = md5::compute(result.as_bytes());
+        let md5_str = base64::encode(md5_digest.0);
+        tracing::debug!("md5_str: {}", base64::encode(md5_digest.0));
+        headers.insert("content-md5", &md5_str);
+        headers.insert("content-type", "application/xml");
+        // headers.insert("encoding-type", "url");
+
+        let result = self
+            .client
+            .delete_multi_object(result_clone, headers, query)
+            .await;
+        tracing::info!("Result: {:?}", result);
+        result
+    }
 }

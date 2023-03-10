@@ -42,7 +42,10 @@ impl Auth for OSS {
             .unwrap_or_default();
         let content_md5 = headers
             .get("Content-MD5")
-            .and_then(|md5| Some(encode(md5.to_str().unwrap_or_default())))
+            .and_then(|md5| {
+                tracing::debug!("md5: {}", md5.to_str().unwrap());
+                Some(md5.to_str().unwrap_or_default())
+            })
             .unwrap_or_default();
 
         let mut oss_headers: Vec<(&HeaderName, &HeaderValue)> = headers
@@ -64,6 +67,8 @@ impl Auth for OSS {
             "{}\n{}\n{}\n{}\n{}{}",
             verb, content_md5, content_type, date, oss_headers_str, oss_resource_str
         );
+
+        tracing::debug!("Local StringToSign: {}", sign_str);
 
         let mut hasher = HmacSha1::new_from_slice(key_secret.as_bytes())
             .expect("Hmac can take key of any size, should not happned");

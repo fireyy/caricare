@@ -20,6 +20,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                 .show(ui, |ui| {
                     ui.horizontal_wrapped(|ui| {
                         ui.add_space(top_bar_style.indent);
+                        // Go to Back button
                         ui.add_enabled_ui(state.navigator.can_go_back(), |ui| {
                             if ui.button("\u{2b05}").on_hover_text("Back").clicked() {
                                 state
@@ -28,8 +29,13 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     .unwrap();
                             }
                         });
+                        // Go to Parent button
                         ui.add_enabled_ui(!state.navigator.location().is_empty(), |ui| {
-                            if ui.button("\u{2b06}").on_hover_text("Go Parent").clicked() {
+                            if ui
+                                .button("\u{2b06}")
+                                .on_hover_text("Go to Parent")
+                                .clicked()
+                            {
                                 let mut parent = String::from("");
                                 let mut current = state.navigator.location();
                                 if current.ends_with('/') {
@@ -45,6 +51,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     .unwrap();
                             }
                         });
+                        // Go Forward button
                         ui.add_enabled_ui(state.navigator.can_go_forward(), |ui| {
                             if ui.button("\u{27a1}").on_hover_text("Forward").clicked() {
                                 state
@@ -53,10 +60,15 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     .unwrap();
                             }
                         });
-
-                        if ui.button("\u{1f310}").on_hover_text("Home").clicked() {
-                            //TODO: Home action
-                        }
+                        // Go to Home button
+                        ui.add_enabled_ui(!state.navigator.location().is_empty(), |ui| {
+                            if ui.button("\u{1f3e0}").on_hover_text("Home").clicked() {
+                                state
+                                    .update_tx
+                                    .send(Update::Navgator(NavgatorType::New("".into())))
+                                    .unwrap();
+                            }
+                        });
                         ui.horizontal(|ui| {
                             ui.set_width(25.0);
                             let enabled = state.status != Status::Busy(Route::List)
@@ -131,12 +143,19 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                             );
                         }
                         ui.separator();
-                        let has_selected = state.list.iter().find(|x| x.selected);
-                        ui.add_enabled_ui(has_selected.is_some(), |ui| {
+                        ui.add_enabled_ui(state.selected_item > 0, |ui| {
                             if ui.button("\u{1f5d0} Copy").clicked() {
                                 //TODO: Copy action
                             }
-                            if ui.button("\u{1f5db} Rename").clicked() {
+                            if ui.button("\u{1f5d1} Delete").clicked() {
+                                state.confirm.show(
+                                    "Do you confirm to delete selected items?",
+                                    ConfirmAction::RemoveFiles,
+                                )
+                            }
+                        });
+                        ui.add_enabled_ui(state.selected_item == 1, |ui| {
+                            if ui.button("\u{270f} Rename").clicked() {
                                 //TODO: Rename action
                             }
                         });

@@ -79,6 +79,7 @@ pub struct State {
     pub toasts: Toasts,
     pub cc_ui: theme::CCUi,
     pub filter_str: String,
+    pub selected_item: usize,
 }
 
 impl State {
@@ -145,6 +146,7 @@ impl State {
             toasts: Toasts::new(),
             cc_ui,
             filter_str: String::new(),
+            selected_item: 0,
         };
 
         this.next_query = Some(this.build_query(None));
@@ -156,13 +158,14 @@ impl State {
     pub fn init(&mut self, ctx: &egui::Context) {
         self.images.poll();
         self.init_confirm(ctx);
+        self.selected_item = self.list.iter().filter(|x| x.selected).count();
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
                 Update::Uploaded(result) => match result {
                     Ok(mut str) => {
                         self.status = Status::Idle(Route::List);
                         self.logs.append(&mut str);
-                        self.is_show_result = true;
+                        self.refresh(ctx);
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::Upload);
@@ -304,6 +307,23 @@ impl State {
         });
     }
 
+    pub fn delete_multi_object(&mut self, ctx: &egui::Context) {
+        self.status = Status::Busy(Route::List);
+
+        let update_tx = self.update_tx.clone();
+        let ctx = ctx.clone();
+        let oss = self.oss().clone();
+        let files: Vec<OssObject> = self.list.iter().filter(|x| x.selected).cloned().collect();
+
+        cc_core::runtime::spawn(async move {
+            tokio::spawn(async move {
+                let res = oss.delete_multi_object(files).await;
+                update_tx.send(Update::Deleted(res)).unwrap();
+                ctx.request_repaint();
+            });
+        });
+    }
+
     pub fn create_folder(&mut self, ctx: &egui::Context, name: String) {
         self.status = Status::Busy(Route::List);
 
@@ -427,6 +447,9 @@ impl State {
                 }
                 ConfirmAction::CreateFolder(name) => {
                     self.create_folder(ctx, name);
+                }
+                ConfirmAction::RemoveFiles => {
+                    self.delete_multi_object(ctx);
                 }
             }
         }

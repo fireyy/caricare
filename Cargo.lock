@@ -362,6 +362,12 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
+
+[[package]]
+name = "base64"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
@@ -496,6 +502,7 @@ name = "cc_core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.20.0",
  "bytesize",
  "cc_oss",
  "chrono",
@@ -505,6 +512,7 @@ dependencies = [
  "flume",
  "image",
  "infer",
+ "md5",
  "once_cell",
  "regex",
  "reqwest",
@@ -538,7 +546,7 @@ name = "cc_oss"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "base64 0.13.1",
+ "base64 0.20.0",
  "bytes",
  "bytesize",
  "chrono",
@@ -1812,6 +1820,12 @@ checksum = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"

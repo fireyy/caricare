@@ -266,6 +266,7 @@ pub enum RequestType {
     Put,
     Delete,
     Head,
+    Post,
 }
 
 impl RequestType {
@@ -275,6 +276,7 @@ impl RequestType {
             RequestType::Put => "PUT",
             RequestType::Delete => "DELETE",
             RequestType::Head => "HEAD",
+            RequestType::Post => "POST",
         }
     }
 }

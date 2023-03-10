@@ -4,13 +4,14 @@ use reqwest::header::InvalidHeaderValue as HttpInvalidHeaderValueError;
 use reqwest::Error as ReqwestError;
 use std::error::Error as StdError;
 use std::io::Error as IoError;
-use std::string::FromUtf8Error;
+// use std::string::FromUtf8Error;
+use std::str::Utf8Error;
 
 #[derive(Debug, Display)]
 pub enum Error {
     Object(ObjectError),
     Io(IoError),
-    String(FromUtf8Error),
+    String(Utf8Error),
     Reqwest(ReqwestError),
     Qxml(QxmlError),
     Http(HttpError),
@@ -61,8 +62,8 @@ impl From<HttpInvalidHeaderNameError> for Error {
     }
 }
 
-impl From<FromUtf8Error> for Error {
-    fn from(e: FromUtf8Error) -> Error {
+impl From<Utf8Error> for Error {
+    fn from(e: Utf8Error) -> Error {
         Error::String(e)
     }
 }

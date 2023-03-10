@@ -7,6 +7,7 @@ pub enum ConfirmAction {
     RemoveSession(Session),
     RemoveFile(OssObject),
     CreateFolder(String),
+    RemoveFiles,
 }
 
 #[derive(Clone, PartialEq)]
