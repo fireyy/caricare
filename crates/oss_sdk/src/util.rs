@@ -1,8 +1,26 @@
+#![allow(unreachable_code)]
+use std::ffi::OsStr;
 use std::io::Write;
+use std::path::PathBuf;
 
 use once_cell::sync::Lazy;
 
 use crate::Result;
+
+pub fn get_name(path: &PathBuf) -> String {
+    path.file_name()
+        .and_then(OsStr::to_str)
+        .unwrap()
+        .to_string()
+}
+
+pub(crate) fn get_name_form_path(path: &str) -> String {
+    path.split('/')
+        .filter(|k| !k.is_empty())
+        .last()
+        .unwrap_or("")
+        .to_string()
+}
 
 pub(crate) fn check_bucket_name(name: &str) -> Result<()> {
     let len = name.len();
@@ -31,12 +49,8 @@ pub(crate) fn check_bucket_name(name: &str) -> Result<()> {
 }
 
 pub(crate) fn query_escape(input: &str) -> String {
-    let s = serde_urlencoded::to_string(vec![("k", input)]).expect("Convert query escape failed!");
+    let s = format!("k={input}");
     s[2..].replace("+", "%20")
-}
-
-pub(crate) fn httptime() -> String {
-    format!("{}", chrono::Utc::now().format("%a, %d %b %Y %H:%M:%S GMT"))
 }
 
 pub(crate) struct SysInfo(String, String, String);

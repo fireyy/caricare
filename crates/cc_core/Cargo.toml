@@ -6,14 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# aliyun-oss-client = "0.10.1"
-# aliyun-oss-client = { git = "https://github.com/tu6ge/oss-rs.git", rev = "84a89cd" }
-# aliyun-oss-client = { path = "../../oss-rs" }
-cc_oss = { workspace = true }
-oss_sdk = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = "0.3.0"
-infer = "0.11.0"
 anyhow = "1.0.66"
 flume = "0.10.14"
 egui = { version = "0.21.0", default-features = false }
@@ -30,6 +24,3 @@ serde_json = { workspace = true }
 thiserror = "1"
 urlencoding = "2.1.0"
 directories-next = "2.0.0"
-chrono = "0.4"
-md5 = "0.7.0"
-base64 = "0.20"

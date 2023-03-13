@@ -2,7 +2,7 @@ use super::item_ui;
 use crate::state::{NavgatorType, State, Update};
 use crate::widgets::confirm::ConfirmAction;
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
-use cc_oss::object::{Object, ObjectType};
+use oss_sdk::ObjectType;
 
 pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
     egui::Grid::new(format!("list"))

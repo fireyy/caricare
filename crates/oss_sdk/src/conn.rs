@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 
-use once_cell::sync::OnceCell;
 use reqsign::AliyunOssBuilder;
 use reqsign::AliyunOssSigner;
 use reqwest::header::{HeaderName, HeaderValue};
@@ -14,11 +13,12 @@ use crate::types::{Credentials, Headers, Params};
 use crate::util;
 use crate::Result;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct Conn {
     config: Arc<ClientConfig>,
     url_maker: Arc<UrlMaker>,
     client: reqwest::Client,
+    signer: Arc<AliyunOssSigner>,
 }
 
 impl Conn {
@@ -26,29 +26,25 @@ impl Conn {
         config: Arc<ClientConfig>,
         url_maker: Arc<UrlMaker>,
         client: reqwest::Client,
-    ) -> Conn {
-        Conn {
+    ) -> Result<Conn> {
+        let mut builder = AliyunOssBuilder::default();
+        builder.access_key_id(&config.access_key_id);
+        builder.access_key_secret(&config.access_key_secret);
+        builder.bucket(&config.bucket);
+
+        let signer = builder.build()?;
+
+        Ok(Conn {
             config,
             url_maker,
             client,
-        }
-    }
-
-    fn get_signer(&self, bucket: &str) -> &AliyunOssSigner {
-        static INSTANCE: OnceCell<AliyunOssSigner> = OnceCell::new();
-        INSTANCE.get_or_init(|| {
-            let mut builder = AliyunOssBuilder::default();
-            builder.access_key_id(&self.config.access_key_id);
-            builder.access_key_secret(&self.config.access_key_secret);
-            builder.bucket(bucket);
-            builder.build().unwrap()
+            signer: Arc::new(signer),
         })
     }
 
     pub(crate) async fn execute(
         &self,
         method: reqwest::Method,
-        bucket: &str,
         object: &str,
         params: Option<Params>,
         headers: Option<Headers>,
@@ -60,19 +56,9 @@ impl Conn {
             None => None,
         };
 
-        let url = self
-            .url_maker
-            .to_uri(bucket, object, &url_params.unwrap_or_default());
-
-        let signer = self.get_signer(bucket);
-
-        // let mut req = Request {
-        //     url,
-        //     method,
-        //     headers: headers.unwrap_or_default(),
-        //     params: params.unwrap_or_default(),
-        //     body: data,
-        // };
+        let url =
+            self.url_maker
+                .to_uri(&self.config.bucket, object, &url_params.unwrap_or_default());
 
         let mut req = Request::new(method, url);
 
@@ -97,20 +83,9 @@ impl Conn {
 
         // TODO: http proxy
 
-        // // http time
-        // let date = util::httptime();
-        // req.headers.insert("date".into(), date);
-
         // user-agent
         req.headers_mut()
             .insert("user-agent", self.config.ua.clone().parse()?);
-
-        // // host
-        // if let Ok(it) = Url::parse(&req.url) {
-        //     if let Some(host) = it.host_str() {
-        //         req.headers.insert("host".into(), host.into());
-        //     }
-        // }
 
         let token = self.config.security_token();
         if !token.is_empty() {
@@ -118,11 +93,16 @@ impl Conn {
                 .insert("x-oss-security-token", token.parse()?);
         }
 
-        //TODO: sign
-        signer.sign(&mut req).expect("sign request must success");
+        if !data.is_empty() {
+            req.body_mut().get_or_insert(data.into());
+        }
+
+        self.signer
+            .sign(&mut req)
+            .expect("sign request must success");
 
         let resp = self.client.execute(req.try_into()?).await?;
-        // let resp = req.send(&self.client).await?;
+
         let status_code = resp.status().as_u16();
         let is_success = resp.status().is_success();
         let b = resp.bytes().await?.to_vec();
@@ -139,8 +119,20 @@ impl Conn {
     }
 
     fn get_url_params(params: &Params) -> Result<String> {
-        let s = serde_urlencoded::to_string(params)?;
-        Ok(s.replace("+", "%20"))
+        tracing::debug!("Params: {:?}", params);
+        let mut result = String::new();
+        for (k, v) in params {
+            if !result.is_empty() {
+                result += "&";
+            }
+            if let Some(vv) = v {
+                result += &format!("{}={}", k, vv);
+            } else {
+                result += k;
+            }
+        }
+
+        Ok(result.replace("+", "%20"))
     }
 }
 
@@ -171,7 +163,7 @@ impl UrlMaker {
             "http" | "https" => match url.host_str() {
                 Some(host) => {
                     let typ = match host.parse::<Ipv4Addr>() {
-                        Ok(add) => UrlType::IP,
+                        Ok(_add) => UrlType::IP,
                         _ => {
                             if is_cname {
                                 UrlType::CNAME

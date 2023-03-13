@@ -17,6 +17,6 @@ once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = "0.4.20"
-serde_urlencoded = "0.7"
 md5 = "0.7.0"
 base64 = "0.20"
+infer = "0.11.0"

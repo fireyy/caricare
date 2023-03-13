@@ -3,7 +3,6 @@ extern crate anyhow;
 
 pub type Result<T> = anyhow::Result<T>;
 
-mod bucket;
 mod client;
 mod config;
 mod conn;
@@ -12,6 +11,7 @@ mod types;
 mod util;
 mod version;
 
-pub use bucket::Bucket;
 pub use client::Client;
+pub use error::OSSError;
+pub use types::{Headers, ListObjects, Object, ObjectType, Params};
 pub use version::VERSION;

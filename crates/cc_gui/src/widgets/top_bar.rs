@@ -77,7 +77,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
 
                             ui.add_enabled_ui(enabled, |ui| {
                                 if ui.button("\u{1f503}").on_hover_text("Refresh").clicked() {
-                                    state.refresh(ui.ctx());
+                                    state.refresh();
                                 }
                             });
                         });
@@ -174,7 +174,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                             }
 
                             if response.changed() {
-                                state.filter(ctx);
+                                state.filter();
                             }
                         });
                     });

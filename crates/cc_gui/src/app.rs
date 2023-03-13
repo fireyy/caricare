@@ -11,7 +11,7 @@ impl App {
         let mut this = Self { state };
 
         if this.state.oss.is_some() {
-            this.state.get_list(&cc.egui_ctx);
+            this.state.get_list();
         }
 
         this

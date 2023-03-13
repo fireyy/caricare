@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::{fmt::Debug, time::Duration};
 
 use once_cell::sync::Lazy;
@@ -44,6 +45,7 @@ pub(crate) struct ClientConfig {
     pub(crate) endpoint: String,
     pub(crate) access_key_id: String,
     pub(crate) access_key_secret: String,
+    pub(crate) bucket: String,
     pub(crate) retries: u32,
     pub(crate) ua: String,
     pub(crate) debug: bool,
@@ -82,6 +84,7 @@ impl Default for ClientConfig {
             endpoint: Default::default(),
             access_key_id: Default::default(),
             access_key_secret: Default::default(),
+            bucket: Default::default(),
             retries: Default::default(),
             ua: ua,
             debug: Default::default(),
