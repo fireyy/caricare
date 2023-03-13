@@ -26,12 +26,6 @@ impl Client {
             .http1_only()
             .timeout(config.timeout)
             .build()?;
-        /*
-        reqwest::Client::builder()
-                .connect_timeout(Duration::from_secs(3))
-                .timeout(Duration::from_secs(3))
-                .build()
-                .unwrap() */
 
         let um = UrlMaker::new(&config.endpoint, config.cname, config.http_proxy.is_some())?;
         let config = Arc::new(config);
@@ -91,7 +85,6 @@ impl Client {
         tracing::debug!("md5_str: {}", base64::encode(md5_digest.0));
         headers.insert("content-md5".into(), md5_str);
         headers.insert("content-type".into(), "application/xml".into());
-        // headers.insert("encoding-type", "url");
 
         tracing::debug!("Delete: query: {:?}, headers: {:?}", query, headers);
 
