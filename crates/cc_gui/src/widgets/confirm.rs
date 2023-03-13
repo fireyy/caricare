@@ -1,11 +1,11 @@
 use cc_core::Session;
-use cc_oss::object::Object as OssObject;
+use oss_sdk::Object;
 
 #[derive(Clone)]
 pub enum ConfirmAction {
     Logout,
     RemoveSession(Session),
-    RemoveFile(OssObject),
+    RemoveFile(Object),
     CreateFolder(String),
     RemoveFiles,
 }

@@ -80,7 +80,7 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
                 if state.next_query.is_some() && current_scroll >= max_scroll && !state.loading_more
                 {
                     state.loading_more = true;
-                    state.load_more(ui.ctx());
+                    state.load_more();
                 }
             });
     });

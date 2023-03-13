@@ -1,12 +1,12 @@
 use crate::theme::text_ellipsis;
 use cc_core::util::is_vaild_img;
 use cc_core::ImageCache;
-use cc_oss::object::Object as OssObject;
 use egui::RichText;
+use oss_sdk::Object;
 
 pub fn item_ui(
     ui: &mut egui::Ui,
-    data: &OssObject,
+    data: &Object,
     url: String,
     images: &mut ImageCache,
 ) -> egui::Response {

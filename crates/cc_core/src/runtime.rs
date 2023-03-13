@@ -36,3 +36,18 @@ where
     });
     rx
 }
+
+#[macro_export]
+macro_rules! spawn_evs {
+    ($state:ident, |$ev:ident, $client:ident| $fut:tt) => {{
+        let $client = $state.oss().clone();
+        let _evs = $state.update_tx.clone();
+        cc_core::runtime::spawn(async move {
+            let _ev = _evs;
+            let $ev = &_ev;
+            {
+                $fut
+            }
+        });
+    }};
+}

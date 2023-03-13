@@ -5,15 +5,11 @@ use crate::widgets::{
 };
 use crate::SUPPORT_EXTENSIONS;
 use cc_core::{
-    log::LogItem, store, tokio, tracing, util::get_extension, CoreError, ImageCache, ImageFetcher,
-    MemoryHistory, OssClient, Session, Setting,
-};
-use cc_oss::{
-    errors::Error as OssError,
-    object::{ListObjects, Object as OssObject},
-    query::Query,
+    log::LogItem, spawn_evs, store, tracing, util::get_extension, ImageCache, ImageFetcher,
+    MemoryHistory, Session, Setting,
 };
 use egui_notify::Toasts;
+use oss_sdk::{Client as OssClient, ListObjects, Object, Params, Result as OssResult};
 use std::{path::PathBuf, sync::mpsc, vec};
 
 #[derive(PartialEq)]
@@ -43,17 +39,19 @@ pub enum NavgatorType {
 }
 
 pub enum Update {
-    Uploaded(Result<Vec<LogItem>, OssError>),
-    List(Result<ListObjects, OssError>),
+    Uploaded(OssResult<Vec<String>>),
+    List(OssResult<ListObjects>),
     Navgator(NavgatorType),
-    Deleted(Result<(), OssError>),
-    CreateFolder(Result<(), OssError>),
+    Deleted(OssResult<()>),
+    CreateFolder(OssResult<()>),
+    ViewObject(String),
+    Object(OssResult<Vec<u8>>),
 }
 
 pub struct State {
     pub oss: Option<OssClient>,
-    pub list: Vec<OssObject>,
-    pub current_img: OssObject,
+    pub list: Vec<Object>,
+    pub current_img: Object,
     pub update_tx: mpsc::SyncSender<Update>,
     pub update_rx: mpsc::Receiver<Update>,
     pub confirm_rx: mpsc::Receiver<ConfirmAction>,
@@ -62,7 +60,7 @@ pub struct State {
     pub img_zoom: f32,
     pub offset: egui::Vec2,
     pub loading_more: bool,
-    pub next_query: Option<Query>,
+    pub next_query: Option<Params>,
     pub scroll_top: bool,
     pub images: ImageCache,
     pub logs: Vec<LogItem>,
@@ -105,9 +103,15 @@ impl State {
         let setting = Setting::load();
 
         if !session.is_empty() && setting.auto_login {
-            match OssClient::new(&session) {
+            match OssClient::builder()
+                .endpoint(&session.endpoint)
+                .access_key(&session.key_id)
+                .access_secret(&session.key_secret)
+                .bucket(&session.bucket)
+                .build()
+            {
                 Ok(client) => {
-                    current_path = client.get_path().to_string();
+                    current_path = "".to_string();
                     oss = Some(client);
                     navigator.push(current_path.clone());
                 }
@@ -120,7 +124,7 @@ impl State {
         let mut this = Self {
             setting,
             oss,
-            current_img: OssObject::default(),
+            current_img: Object::default(),
             list: vec![],
             update_tx,
             update_rx,
@@ -162,14 +166,16 @@ impl State {
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
                 Update::Uploaded(result) => match result {
-                    Ok(mut str) => {
+                    Ok(str) => {
                         self.status = Status::Idle(Route::List);
-                        self.logs.append(&mut str);
-                        self.refresh(ctx);
+                        for s in str {
+                            self.logs.push(LogItem::upload().with_info(s));
+                        }
+                        self.refresh();
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::Upload);
-                        self.err = Some(err.message());
+                        self.err = Some(err.to_string());
                     }
                 },
                 Update::List(result) => match result {
@@ -185,7 +191,7 @@ impl State {
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
-                        self.err = Some(err.message());
+                        self.err = Some(err.to_string());
                     }
                 },
                 Update::Navgator(nav) => {
@@ -205,13 +211,13 @@ impl State {
                         }
                     }
                     self.current_path = self.navigator.location();
-                    self.refresh(ctx);
+                    self.refresh();
                 }
                 Update::Deleted(result) => match result {
                     Ok(_) => {
                         //
                         self.toasts.success("Delete Successed");
-                        self.refresh(ctx);
+                        self.refresh();
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -222,7 +228,19 @@ impl State {
                     Ok(_) => {
                         //
                         self.toasts.success("Create Successed");
-                        self.refresh(ctx);
+                        self.refresh();
+                    }
+                    Err(err) => {
+                        self.status = Status::Idle(Route::List);
+                        self.err = Some(err.to_string());
+                    }
+                },
+                Update::ViewObject(name) => {
+                    self.get_object(name);
+                }
+                Update::Object(result) => match result {
+                    Ok(_) => {
+                        //TODO: show object
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -247,7 +265,7 @@ impl State {
             self.picked_path = files;
         }
 
-        self.upload_file(ctx);
+        self.upload_file();
 
         if !ctx.input(|i| i.raw.dropped_files.is_empty()) {
             self.dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
@@ -266,10 +284,10 @@ impl State {
     }
 
     pub fn get_oss_url(&self, path: &str) -> String {
-        self.oss().get_file_url(path)
+        format!("{}{path}", self.oss().get_bucket_url())
     }
 
-    pub fn upload_file(&mut self, ctx: &egui::Context) {
+    pub fn upload_file(&mut self) {
         if self.picked_path.is_empty() {
             return;
         }
@@ -277,94 +295,74 @@ impl State {
         self.picked_path = vec![];
         self.status = Status::Busy(Route::Upload);
 
-        let update_tx = self.update_tx.clone();
-        let ctx = ctx.clone();
-        let oss = self.oss().clone();
         let dest = self.current_path.clone();
 
-        cc_core::runtime::spawn(async move {
-            tokio::spawn(async move {
-                let res = oss.put_multi(picked_path, dest).await;
-                update_tx.send(Update::Uploaded(res)).unwrap();
-                ctx.request_repaint();
-            });
+        spawn_evs!(self, |evs, client| {
+            let res = client.put_multi(picked_path, dest).await;
+            evs.send(Update::Uploaded(res)).unwrap();
         });
     }
 
-    pub fn delete_object(&mut self, ctx: &egui::Context, file: OssObject) {
+    pub fn delete_object(&mut self, file: Object) {
         self.status = Status::Busy(Route::List);
 
-        let update_tx = self.update_tx.clone();
-        let ctx = ctx.clone();
-        let oss = self.oss().clone();
-
-        cc_core::runtime::spawn(async move {
-            tokio::spawn(async move {
-                let res = oss.delete_object(file).await;
-                update_tx.send(Update::Deleted(res)).unwrap();
-                ctx.request_repaint();
-            });
+        spawn_evs!(self, |evs, client| {
+            let res = client.delete_object(file.key()).await;
+            evs.send(Update::Deleted(res)).unwrap();
         });
     }
 
-    pub fn delete_multi_object(&mut self, ctx: &egui::Context) {
+    pub fn delete_multi_object(&mut self) {
         self.status = Status::Busy(Route::List);
 
-        let update_tx = self.update_tx.clone();
-        let ctx = ctx.clone();
-        let oss = self.oss().clone();
-        let files: Vec<OssObject> = self.list.iter().filter(|x| x.selected).cloned().collect();
+        let files: Vec<Object> = self.list.iter().filter(|x| x.selected).cloned().collect();
 
-        cc_core::runtime::spawn(async move {
-            tokio::spawn(async move {
-                let res = oss.delete_multi_object(files).await;
-                update_tx.send(Update::Deleted(res)).unwrap();
-                ctx.request_repaint();
-            });
+        spawn_evs!(self, |evs, client| {
+            let res = client.delete_multi_object(files).await;
+            evs.send(Update::Deleted(res)).unwrap();
         });
     }
 
-    pub fn create_folder(&mut self, ctx: &egui::Context, name: String) {
+    pub fn create_folder(&mut self, name: String) {
         self.status = Status::Busy(Route::List);
 
-        let update_tx = self.update_tx.clone();
-        let ctx = ctx.clone();
-        let oss = self.oss().clone();
         let name = format!("{}{}", self.current_path, name);
 
-        cc_core::runtime::spawn(async move {
-            tokio::spawn(async move {
-                let res = oss.create_folder(name).await;
-                update_tx.send(Update::CreateFolder(res)).unwrap();
-                ctx.request_repaint();
-            });
+        spawn_evs!(self, |evs, client| {
+            let res = client.create_folder(name).await;
+            evs.send(Update::CreateFolder(res)).unwrap();
         });
     }
 
-    pub fn get_list(&mut self, ctx: &egui::Context) {
+    pub fn get_object(&mut self, name: String) {
+        // self.status = Status::Busy(Route::List);
+
+        // let name = format!("{}{}", self.current_path, name);
+
+        spawn_evs!(self, |evs, client| {
+            let res = client.get_object(name).await;
+            evs.send(Update::Object(res)).unwrap();
+        });
+    }
+
+    pub fn get_list(&mut self) {
         if let Some(query) = &self.next_query {
             if !self.loading_more {
                 self.status = Status::Busy(Route::List);
             }
 
-            let update_tx = self.update_tx.clone();
-            let ctx = ctx.clone();
             let query = query.clone();
-            let oss = self.oss().clone();
 
-            cc_core::runtime::spawn(async move {
-                tokio::spawn(async move {
-                    let res = oss.get_list(query).await;
-                    update_tx.send(Update::List(res)).unwrap();
-                    ctx.request_repaint();
-                });
+            spawn_evs!(self, |evs, client| {
+                let res = client.list_v2(Some(query)).await;
+                evs.send(Update::List(res)).unwrap();
             });
         }
     }
 
     pub fn set_list(&mut self, obj: ListObjects) {
         let mut dirs = obj.common_prefixes;
-        let mut files: Vec<OssObject> = obj
+        let mut files: Vec<Object> = obj
             .objects
             .into_iter()
             .filter(|x| !x.key().ends_with('/'))
@@ -373,30 +371,30 @@ impl State {
         self.list.append(&mut files);
     }
 
-    pub fn load_more(&mut self, ctx: &egui::Context) {
-        tracing::info!("load more!");
+    pub fn load_more(&mut self) {
+        tracing::debug!("load more!");
         if self.next_query.is_some() {
-            self.get_list(ctx);
+            self.get_list();
         } else {
             //no more
         }
     }
 
-    pub fn refresh(&mut self, ctx: &egui::Context) {
+    pub fn refresh(&mut self) {
         self.err = None;
         self.scroll_top = true;
         let current_path = self.navigator.location();
         self.current_path = current_path;
         self.next_query = Some(self.build_query(None));
         self.list = vec![];
-        self.get_list(ctx);
+        self.get_list();
     }
 
-    pub fn filter(&mut self, ctx: &egui::Context) {
-        self.refresh(ctx);
+    pub fn filter(&mut self) {
+        self.refresh();
     }
 
-    fn build_query(&self, next_token: Option<String>) -> Query {
+    fn build_query(&self, next_token: Option<String>) -> Params {
         let mut path = self.current_path.clone();
         if !path.ends_with('/') && !path.is_empty() {
             path.push_str("/");
@@ -404,24 +402,32 @@ impl State {
         if !self.filter_str.is_empty() {
             path.push_str(&self.filter_str);
         }
-        let mut query = Query::new();
-        query.insert("prefix", path);
-        query.insert("delimiter", "/");
-        query.insert("max-keys", self.setting.page_limit);
+        let mut query = Params::new();
+        query.insert("list-type".into(), Some("2".to_string()));
+        query.insert("prefix".into(), Some(path));
+        query.insert("delimiter".into(), Some("/".into()));
+        query.insert("max-keys".into(), Some(self.setting.page_limit.to_string()));
         if let Some(token) = next_token {
-            query.insert("continuation-token", token);
+            query.insert("continuation-token".into(), Some(token));
         }
         query
     }
 
-    pub fn login(&mut self, ctx: &egui::Context) -> Result<(), CoreError> {
-        let client = OssClient::new(&self.session)?;
+    pub fn login(&mut self) -> OssResult<()> {
+        tracing::debug!("Login with session: {:?}", self.session);
+        let client = OssClient::builder()
+            .endpoint(&self.session.endpoint)
+            .access_key(&self.session.key_id)
+            .access_secret(&self.session.key_secret)
+            .bucket(&self.session.bucket)
+            .build()?;
+
         let _ = store::put_session(&self.session)?;
-        let current_path = client.get_path().to_string();
+        let current_path = "".to_string();
         self.current_path = current_path.clone();
         self.navigator.push(current_path);
         self.oss = Some(client);
-        self.refresh(ctx);
+        self.refresh();
         self.setting.auto_login = true;
         self.sessions = self.load_all_session();
         Ok(())
@@ -443,13 +449,13 @@ impl State {
                     self.sessions = self.load_all_session();
                 }
                 ConfirmAction::RemoveFile(obj) => {
-                    self.delete_object(ctx, obj);
+                    self.delete_object(obj);
                 }
                 ConfirmAction::CreateFolder(name) => {
-                    self.create_folder(ctx, name);
+                    self.create_folder(name);
                 }
                 ConfirmAction::RemoveFiles => {
-                    self.delete_multi_object(ctx);
+                    self.delete_multi_object();
                 }
             }
         }

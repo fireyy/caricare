@@ -32,7 +32,7 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                 ui.add_space(20.0);
 
                 if ui.button("Login").clicked() {
-                    match state.login(ui.ctx()) {
+                    match state.login() {
                         Ok(_) => {
                             state
                                 .toasts

@@ -1,0 +1,22 @@
+[package]
+name = "oss_sdk"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0"
+anyhow = "1.0"
+reqwest = { version = "0.11.13", default-features = false }
+quick-xml = "0.27"
+tracing = { workspace = true }
+bytesize = "1.1.0"
+reqsign = { version = "0.8.3", features = ["reqwest_request"] }
+once_cell = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = "0.4.20"
+md5 = "0.7.0"
+base64 = "0.20"
+infer = "0.11.0"

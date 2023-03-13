@@ -2,7 +2,7 @@ use super::item_ui;
 use crate::state::{NavgatorType, State, Update};
 use crate::widgets::confirm::ConfirmAction;
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
-use cc_oss::object::ObjectType;
+use oss_sdk::ObjectType;
 
 pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
     egui::Grid::new(format!("list"))
@@ -47,9 +47,13 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                             {
                                 match data.obj_type() {
                                     ObjectType::File => {
-                                        state.current_img = data.clone();
-                                        state.is_preview = true;
-                                        ui.ctx().request_repaint();
+                                        state
+                                            .update_tx
+                                            .send(Update::ViewObject(data.key().to_string()))
+                                            .unwrap();
+                                        // state.current_img = data.clone();
+                                        // state.is_preview = true;
+                                        // ui.ctx().request_repaint();
                                     }
                                     ObjectType::Folder => {
                                         state
