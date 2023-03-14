@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use reqsign::AliyunOssBuilder;
 use reqsign::AliyunOssSigner;
-use reqwest::header::{HeaderName, HeaderValue};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Request, Url};
 
 use crate::config::ClientConfig;
@@ -12,6 +12,7 @@ use crate::error::{OSSError, ServiceError};
 use crate::types::{Credentials, Headers, Params};
 use crate::util;
 use crate::Result;
+use time::Duration;
 
 #[derive(Clone)]
 pub(crate) struct Conn {
@@ -50,7 +51,7 @@ impl Conn {
         headers: Option<Headers>,
         data: Vec<u8>,
         init_crc: u64,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<(Vec<u8>, HeaderMap)> {
         let url_params = match params {
             Some(ref it) => Some(Self::get_url_params(it)?),
             None => None,
@@ -102,13 +103,14 @@ impl Conn {
             .expect("sign request must success");
 
         let resp = self.client.execute(req.try_into()?).await?;
+        let header = resp.headers().clone();
 
         let status_code = resp.status().as_u16();
         let is_success = resp.status().is_success();
         let b = resp.bytes().await?.to_vec();
 
         if is_success {
-            Ok(b)
+            Ok((b, header))
         } else {
             if let Ok(e) = ServiceError::try_from_xml(&b) {
                 Err(OSSError::ServiceError(status_code, e.code, e.message, e.request_id).into())
@@ -133,6 +135,26 @@ impl Conn {
         }
 
         Ok(result.replace("+", "%20"))
+    }
+
+    pub(crate) fn signature_url(&self, object: &str, params: Option<Params>) -> Result<String> {
+        let url_params = match params {
+            Some(ref it) => Some(Self::get_url_params(it)?),
+            None => None,
+        };
+
+        let url =
+            self.url_maker
+                .to_uri(&self.config.bucket, object, &url_params.unwrap_or_default());
+
+        let mut req = Request::new(reqwest::Method::GET, url);
+        self.signer
+            .sign_query(&mut req, Duration::seconds(3600))
+            .expect("sign request must success");
+
+        tracing::debug!("signature url: {}", req.url());
+
+        Ok("".into())
     }
 }
 

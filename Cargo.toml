@@ -18,6 +18,7 @@ osx_minimum_system_version = "10.12"
 cc_core = { workspace = true }
 cc_gui = { workspace = true }
 eframe = { workspace = true }
+cc_runtime = { workspace = true }
 
 [workspace]
 resolver = "2"
@@ -36,7 +37,10 @@ version = "0.1.0"
 cc_core = { path = "crates/cc_core" }
 cc_gui = { path = "crates/cc_gui" }
 oss_sdk = { path = "crates/oss_sdk" }
+cc_runtime = { path = "crates/cc_runtime" }
+cc_images = { path = "crates/cc_images" }
 eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
+egui = "0.21.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1.29"

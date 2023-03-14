@@ -4,6 +4,25 @@ use crate::widgets::confirm::ConfirmAction;
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use oss_sdk::ObjectType;
 
+macro_rules! handle_click {
+    ($state:ident, $data:ident) => {{
+        match $data.obj_type() {
+            ObjectType::File => {
+                $state
+                    .update_tx
+                    .send(Update::ViewObject($data.clone()))
+                    .unwrap();
+            }
+            ObjectType::Folder => {
+                $state
+                    .update_tx
+                    .send(Update::Navgator(NavgatorType::New($data.key().to_string())))
+                    .unwrap();
+            }
+        };
+    }};
+}
+
 pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
     egui::Grid::new(format!("list"))
         .num_columns(1)
@@ -45,25 +64,23 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                                 .on_hover_text(data.name())
                                 .clicked()
                             {
-                                match data.obj_type() {
-                                    ObjectType::File => {
-                                        state
-                                            .update_tx
-                                            .send(Update::ViewObject(data.key().to_string()))
-                                            .unwrap();
-                                        // state.current_img = data.clone();
-                                        // state.is_preview = true;
-                                        // ui.ctx().request_repaint();
-                                    }
-                                    ObjectType::Folder => {
-                                        state
-                                            .update_tx
-                                            .send(Update::Navgator(NavgatorType::New(
-                                                data.key().to_string(),
-                                            )))
-                                            .unwrap();
-                                    }
-                                }
+                                handle_click!(state, data);
+                                // match data.obj_type() {
+                                //     ObjectType::File => {
+                                //         state
+                                //             .update_tx
+                                //             .send(Update::ViewObject(data.clone()))
+                                //             .unwrap();
+                                //     }
+                                //     ObjectType::Folder => {
+                                //         state
+                                //             .update_tx
+                                //             .send(Update::Navgator(NavgatorType::New(
+                                //                 data.key().to_string(),
+                                //             )))
+                                //             .unwrap();
+                                //     }
+                                // }
                             }
                         });
                     });
@@ -91,25 +108,27 @@ pub fn thumb_ui(
             for i in row_range {
                 for j in 0..num_cols {
                     if let Some(d) = state.list.get(j + i * num_cols) {
-                        let url = state.get_oss_url(&d.key());
+                        let url = state.get_thumb_url(&d.key(), 64);
                         let data = d.clone();
                         let resp = item_ui(ui, &data, url.clone(), &mut state.images);
                         if resp.on_hover_text(d.name()).clicked() {
-                            match data.obj_type() {
-                                ObjectType::File => {
-                                    state.current_img = data.clone();
-                                    state.is_preview = true;
-                                    ui.ctx().request_repaint();
-                                }
-                                ObjectType::Folder => {
-                                    state
-                                        .update_tx
-                                        .send(Update::Navgator(NavgatorType::New(
-                                            data.key().to_string(),
-                                        )))
-                                        .unwrap();
-                                }
-                            }
+                            handle_click!(state, data);
+                            // match data.obj_type() {
+                            //     ObjectType::File => {
+                            //         state
+                            //             .update_tx
+                            //             .send(Update::ViewObject(data.clone()))
+                            //             .unwrap();
+                            //     }
+                            //     ObjectType::Folder => {
+                            //         state
+                            //             .update_tx
+                            //             .send(Update::Navgator(NavgatorType::New(
+                            //                 data.key().to_string(),
+                            //             )))
+                            //             .unwrap();
+                            //     }
+                            // }
                         }
                     }
                 }

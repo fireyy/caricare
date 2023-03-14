@@ -1,0 +1,10 @@
+[package]
+name = "cc_runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+once_cell = "1.16.0"
+tokio = { version = "1.22.0", features = ["rt-multi-thread", "macros", "sync"] }
+uuid = { version = "1.2.2", features = ["v4"] }
+tracing = { workspace = true }

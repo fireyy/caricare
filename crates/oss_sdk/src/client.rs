@@ -7,6 +7,7 @@ use crate::conn::{Conn, UrlMaker};
 use crate::types::{Headers, ListObjects, Object, Params};
 use crate::util::{self, get_name};
 use crate::Result;
+use reqwest::header::HeaderMap;
 
 #[derive(Clone)]
 pub struct Client {
@@ -46,10 +47,24 @@ impl Client {
         bucket_url
     }
 
+    pub async fn head_object(&self, object: impl AsRef<str>) -> Result<HeaderMap> {
+        let object = object.as_ref();
+        let (_, headers) = self
+            .do_request(reqwest::Method::HEAD, object, None, None, vec![])
+            .await?;
+
+        tracing::debug!("Response header: {:?}", headers);
+
+        Ok(headers)
+    }
+
     pub async fn get_object(&self, object: impl AsRef<str>) -> Result<Vec<u8>> {
         let object = object.as_ref();
-        self.do_request(reqwest::Method::GET, object, None, None, vec![])
-            .await
+        let (resp, _headers) = self
+            .do_request(reqwest::Method::GET, object, None, None, vec![])
+            .await?;
+
+        Ok(resp)
     }
 
     pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<()> {
@@ -103,7 +118,7 @@ impl Client {
 
     pub async fn list_v2(&self, query: Option<Params>) -> Result<ListObjects> {
         tracing::debug!("List object: {:?}", query);
-        let resp = self
+        let (resp, headers) = self
             .do_request(reqwest::Method::GET, "", query, None, vec![])
             .await?;
 
@@ -115,7 +130,7 @@ impl Client {
 
         let mut bucket_name = String::new();
         let mut prefix = String::new();
-        let mut marker = String::new();
+        let mut start_after = String::new();
         let mut max_keys = String::new();
         let mut delimiter = String::new();
         let mut is_truncated = false;
@@ -123,7 +138,6 @@ impl Client {
         let mut key = String::new();
         let mut last_modified = String::new();
         let mut etag = String::new();
-        let mut r#type = String::new();
         let mut size = 0usize;
         let mut storage_class = String::new();
         let mut owner_id = String::new();
@@ -152,7 +166,7 @@ impl Client {
                             prefix = reader.read_text(e.name())?.to_string();
                         }
                     }
-                    b"Marker" => marker = reader.read_text(e.name())?.to_string(),
+                    b"StartAfter" => start_after = reader.read_text(e.name())?.to_string(),
                     b"MaxKeys" => max_keys = reader.read_text(e.name())?.to_string(),
                     b"Delimiter" => delimiter = reader.read_text(e.name())?.to_string(),
                     b"IsTruncated" => {
@@ -172,7 +186,6 @@ impl Client {
                     b"Key" => key = reader.read_text(e.name())?.to_string(),
                     b"LastModified" => last_modified = reader.read_text(e.name())?.to_string(),
                     b"ETag" => etag = reader.read_text(e.name())?.to_string(),
-                    b"Type" => r#type = reader.read_text(e.name())?.to_string(),
                     b"Size" => size = reader.read_text(e.name())?.parse::<usize>().unwrap(),
                     b"StorageClass" => storage_class = reader.read_text(e.name())?.to_string(),
                     b"Owner" => {
@@ -194,7 +207,6 @@ impl Client {
                             last_modified.clone(),
                             size,
                             etag.clone(),
-                            r#type.clone(),
                             storage_class.clone(),
                             owner_id.clone(),
                             owner_display_name.clone(),
@@ -209,7 +221,7 @@ impl Client {
                         bucket_name,
                         delimiter,
                         prefix,
-                        marker,
+                        start_after,
                         max_keys,
                         is_truncated,
                         next_continuation_token,
@@ -279,6 +291,10 @@ impl Client {
         Ok(results)
     }
 
+    pub fn signature_url(&self, object: &str, params: Option<Params>) -> Result<String> {
+        self.conn.signature_url(object, params)
+    }
+
     async fn do_request(
         &self,
         method: reqwest::Method,
@@ -286,7 +302,7 @@ impl Client {
         query: Option<Params>,
         headers: Option<Headers>,
         data: Vec<u8>,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<(Vec<u8>, reqwest::header::HeaderMap)> {
         util::check_bucket_name(&self.config.bucket)?;
 
         self.conn

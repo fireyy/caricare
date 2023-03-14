@@ -1,6 +1,6 @@
 use crate::theme::text_ellipsis;
 use cc_core::util::is_vaild_img;
-use cc_core::ImageCache;
+use cc_images::Cache as ImageCache;
 use egui::RichText;
 use oss_sdk::Object;
 

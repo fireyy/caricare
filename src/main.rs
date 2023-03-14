@@ -4,6 +4,8 @@ use cc_gui::App;
 fn main() -> Result<(), eframe::Error> {
     init_core();
 
+    let wait_for_shutdown = cc_runtime::start();
+
     eframe::run_native(
         "Caricare",
         eframe::NativeOptions {
@@ -24,6 +26,8 @@ fn main() -> Result<(), eframe::Error> {
         },
         Box::new(|cc: &eframe::CreationContext| Box::new(App::new(cc))),
     )?;
+
+    wait_for_shutdown();
 
     Ok(())
 }

@@ -1,15 +1,12 @@
 mod error;
 mod history;
-mod image_cache;
 pub mod log;
-pub mod runtime;
 mod session;
 mod setting;
 pub mod store;
 pub mod util;
 pub use error::CoreError;
 pub use history::MemoryHistory;
-pub use image_cache::{ImageCache, ImageFetcher};
 pub use session::Session;
 pub use setting::{Setting, ShowType};
 pub use tracing;
@@ -44,8 +41,6 @@ pub fn init_core() {
     }
 
     tracing_subscriber::fmt::init();
-
-    runtime::start().unwrap();
 
     let content_store = store::ContentStore::default();
     content_store.create_req_dirs().unwrap();

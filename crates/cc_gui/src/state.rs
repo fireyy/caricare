@@ -1,16 +1,16 @@
+use crate::spawn_evs;
 use crate::theme;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
     image_view_ui, log_panel_ui,
 };
 use crate::SUPPORT_EXTENSIONS;
-use cc_core::{
-    log::LogItem, spawn_evs, store, tracing, util::get_extension, ImageCache, ImageFetcher,
-    MemoryHistory, Session, Setting,
-};
+use cc_core::{log::LogItem, store, tracing, util::get_extension, MemoryHistory, Session, Setting};
+use cc_images::Cache as ImageCache;
 use egui_notify::Toasts;
-use oss_sdk::{Client as OssClient, ListObjects, Object, Params, Result as OssResult};
+use oss_sdk::{Client as OssClient, HeaderMap, ListObjects, Object, Params, Result as OssResult};
 use std::{path::PathBuf, sync::mpsc, vec};
+// ImageCache, ImageFetcher,
 
 #[derive(PartialEq)]
 pub enum Status {
@@ -44,8 +44,9 @@ pub enum Update {
     Navgator(NavgatorType),
     Deleted(OssResult<()>),
     CreateFolder(OssResult<()>),
-    ViewObject(String),
-    Object(OssResult<Vec<u8>>),
+    ViewObject(Object),
+    HeadObject(OssResult<HeaderMap>),
+    GetObject(OssResult<Vec<u8>>),
 }
 
 pub struct State {
@@ -95,8 +96,9 @@ impl State {
 
         let mut current_path = String::from("");
         let navigator = MemoryHistory::new();
+        let ctx_clone = ctx.clone();
 
-        let images = ImageCache::new(ImageFetcher::spawn(ctx.clone()));
+        let images = ImageCache::create(move || ctx_clone.request_repaint());
 
         let mut status = Status::Idle(Route::List);
 
@@ -235,12 +237,29 @@ impl State {
                         self.err = Some(err.to_string());
                     }
                 },
-                Update::ViewObject(name) => {
-                    self.get_object(name);
+                Update::ViewObject(obj) => {
+                    // self.current_img = obj;
+                    self.get_object(obj.key());
                 }
-                Update::Object(result) => match result {
-                    Ok(_) => {
+                Update::GetObject(result) => match result {
+                    Ok(headers) => {
                         //TODO: show object
+                        self.is_preview = true;
+                    }
+                    Err(err) => {
+                        self.status = Status::Idle(Route::List);
+                        self.err = Some(err.to_string());
+                    }
+                },
+                Update::HeadObject(result) => match result {
+                    Ok(headers) => {
+                        let url = self.get_signature_url(self.current_img.key());
+                        self.current_img.set_url(url);
+                        if let Some(mint_type) = headers.get("content-type") {
+                            self.current_img
+                                .set_mine_type(mint_type.to_str().unwrap().to_string());
+                        }
+                        self.is_preview = true;
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -283,8 +302,17 @@ impl State {
         self.oss.as_ref().expect("Oss not initialized yet")
     }
 
-    pub fn get_oss_url(&self, path: &str) -> String {
-        format!("{}{path}", self.oss().get_bucket_url())
+    pub fn get_signature_url(&self, name: &str) -> String {
+        self.oss().signature_url(name, None).unwrap()
+    }
+
+    pub fn get_thumb_url(&self, name: &str, size: u16) -> String {
+        let mut params = Params::new();
+        params.insert(
+            "x-oss-process".into(),
+            Some(format!("image/resize,w_{size}")),
+        );
+        self.oss().signature_url(name, Some(params)).unwrap()
     }
 
     pub fn upload_file(&mut self) {
@@ -334,14 +362,27 @@ impl State {
         });
     }
 
-    pub fn get_object(&mut self, name: String) {
+    pub fn head_object(&mut self, name: &str) {
         // self.status = Status::Busy(Route::List);
 
         // let name = format!("{}{}", self.current_path, name);
+        let name = name.to_string();
+
+        spawn_evs!(self, |evs, client| {
+            let res = client.head_object(name).await;
+            evs.send(Update::HeadObject(res)).unwrap();
+        });
+    }
+
+    pub fn get_object(&mut self, name: &str) {
+        // self.status = Status::Busy(Route::List);
+
+        // let name = format!("{}{}", self.current_path, name);
+        let name = name.to_string();
 
         spawn_evs!(self, |evs, client| {
             let res = client.get_object(name).await;
-            evs.send(Update::Object(res)).unwrap();
+            evs.send(Update::GetObject(res)).unwrap();
         });
     }
 

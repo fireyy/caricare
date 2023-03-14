@@ -1,6 +1,8 @@
 use crate::util::get_name_form_path;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
+use time::format_description::well_known::Rfc3339;
+use time::{format_description, OffsetDateTime};
 
 pub type Params = BTreeMap<String, Option<String>>;
 pub type Headers = HashMap<String, String>;
@@ -26,7 +28,7 @@ pub struct ListObjects {
     bucket_name: String,
     delimiter: String,
     prefix: String,
-    marker: String,
+    start_after: String,
     max_keys: String,
     is_truncated: bool,
     next_continuation_token: Option<String>,
@@ -40,7 +42,7 @@ impl ListObjects {
         bucket_name: String,
         delimiter: String,
         prefix: String,
-        marker: String,
+        start_after: String,
         max_keys: String,
         is_truncated: bool,
         next_continuation_token: Option<String>,
@@ -52,7 +54,7 @@ impl ListObjects {
             bucket_name,
             delimiter,
             prefix,
-            marker,
+            start_after,
             max_keys,
             is_truncated,
             next_continuation_token,
@@ -74,8 +76,8 @@ impl ListObjects {
         &self.prefix
     }
 
-    pub fn marker(&self) -> &str {
-        &self.marker
+    pub fn start_after(&self) -> &str {
+        &self.start_after
     }
 
     pub fn max_keys(&self) -> &str {
@@ -104,12 +106,13 @@ pub struct Object {
     last_modified: String,
     size: usize,
     etag: String,
-    r#type: String,
+    mine_type: String,
     storage_class: String,
     owner_id: String,
     owner_display_name: String,
     obj_type: ObjectType,
     pub selected: bool,
+    url: String,
 }
 
 impl Object {
@@ -119,7 +122,6 @@ impl Object {
         size: usize,
 
         etag: String,
-        r#type: String,
         storage_class: String,
         owner_id: String,
         owner_display_name: String,
@@ -129,12 +131,13 @@ impl Object {
             last_modified,
             size,
             etag,
-            r#type,
+            mine_type: Default::default(),
             storage_class,
             owner_id,
             owner_display_name,
             obj_type: ObjectType::File,
             selected: false,
+            url: Default::default(),
         }
     }
 
@@ -162,8 +165,8 @@ impl Object {
         &self.etag
     }
 
-    pub fn r#type(&self) -> &str {
-        &self.r#type
+    pub fn mine_type(&self) -> &str {
+        &self.mine_type
     }
 
     pub fn storage_class(&self) -> &str {
@@ -186,6 +189,10 @@ impl Object {
         &self.obj_type
     }
 
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
     pub fn size_string(&self) -> String {
         if self.size.eq(&0) {
             "Folder".into()
@@ -198,8 +205,13 @@ impl Object {
         if self.last_modified.is_empty() {
             "-".into()
         } else {
-            match chrono::DateTime::parse_from_rfc3339(&self.last_modified) {
-                Ok(date) => date.format("%Y-%m-%d %H:%M:%S").to_string(),
+            match OffsetDateTime::parse(&self.last_modified, &Rfc3339) {
+                Ok(date) => {
+                    let format =
+                        format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
+                            .unwrap();
+                    date.format(&format).unwrap()
+                }
                 Err(_) => "_".into(),
             }
         }
@@ -209,5 +221,11 @@ impl Object {
     }
     pub fn is_folder(&self) -> bool {
         self.obj_type == ObjectType::Folder
+    }
+    pub fn set_url(&mut self, url: String) {
+        self.url = url;
+    }
+    pub fn set_mine_type(&mut self, mine_type: String) {
+        self.mine_type = mine_type;
     }
 }

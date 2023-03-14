@@ -13,5 +13,6 @@ mod version;
 
 pub use client::Client;
 pub use error::OSSError;
+pub use reqwest::header::HeaderMap;
 pub use types::{Headers, ListObjects, Object, ObjectType, Params};
 pub use version::VERSION;

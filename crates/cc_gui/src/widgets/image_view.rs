@@ -39,9 +39,7 @@ fn zoom_action(win_size: egui::Vec2, state: &mut State, zoom_type: ZoomType) {
 }
 
 pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
-    let url = state.get_oss_url(state.current_img.key());
-
-    if url.is_empty() {
+    if state.current_img.key().is_empty() || !state.current_img.is_file() {
         return;
     }
 
@@ -64,7 +62,7 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                 .auto_shrink([false; 2])
                 .max_height(win_size.y - 110.0)
                 .show(ui, |ui| {
-                    if let Some(img) = state.images.get(&url) {
+                    if let Some(img) = state.images.get(&state.current_img.url()) {
                         let mut size = img.size_vec2();
                         size = if state.img_zoom != 1.0 {
                             size * state.img_zoom
@@ -114,10 +112,10 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                         zoom_action(win_size, state, ZoomType::Out);
                     }
                 });
-                let mut url = url;
+                let mut url = state.current_img.url();
                 let resp = ui.add(egui::TextEdit::singleline(&mut url));
                 if resp.on_hover_text("Click to copy").clicked() {
-                    ui.output_mut(|o| o.copied_text = url);
+                    ui.output_mut(|o| o.copied_text = url.to_string());
                 }
                 ui.horizontal(|ui| {
                     ui.label(format!(
