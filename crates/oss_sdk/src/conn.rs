@@ -137,7 +137,12 @@ impl Conn {
         Ok(result.replace("+", "%20"))
     }
 
-    pub(crate) fn signature_url(&self, object: &str, params: Option<Params>) -> Result<String> {
+    pub(crate) fn signature_url(
+        &self,
+        object: &str,
+        expire: i64,
+        params: Option<Params>,
+    ) -> Result<String> {
         let url_params = match params {
             Some(ref it) => Some(Self::get_url_params(it)?),
             None => None,
@@ -149,12 +154,12 @@ impl Conn {
 
         let mut req = Request::new(reqwest::Method::GET, url);
         self.signer
-            .sign_query(&mut req, Duration::seconds(3600))
+            .sign_query(&mut req, Duration::seconds(expire))
             .expect("sign request must success");
 
         tracing::debug!("signature url: {}", req.url());
 
-        Ok("".into())
+        Ok(req.url().to_string())
     }
 }
 

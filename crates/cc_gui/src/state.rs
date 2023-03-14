@@ -8,9 +8,10 @@ use crate::SUPPORT_EXTENSIONS;
 use cc_core::{log::LogItem, store, tracing, util::get_extension, MemoryHistory, Session, Setting};
 use cc_images::Cache as ImageCache;
 use egui_notify::Toasts;
-use oss_sdk::{Client as OssClient, HeaderMap, ListObjects, Object, Params, Result as OssResult};
+use oss_sdk::{
+    Bucket, Client as OssClient, HeaderMap, ListObjects, Object, Params, Result as OssResult,
+};
 use std::{path::PathBuf, sync::mpsc, vec};
-// ImageCache, ImageFetcher,
 
 #[derive(PartialEq)]
 pub enum Status {
@@ -47,6 +48,7 @@ pub enum Update {
     ViewObject(Object),
     HeadObject(OssResult<HeaderMap>),
     GetObject(OssResult<Vec<u8>>),
+    BucketInfo(OssResult<Bucket>),
 }
 
 pub struct State {
@@ -80,6 +82,7 @@ pub struct State {
     pub filter_str: String,
     pub selected_item: usize,
     pub ctx: egui::Context,
+    pub bucket: Option<Bucket>,
 }
 
 impl State {
@@ -155,10 +158,12 @@ impl State {
             filter_str: String::new(),
             selected_item: 0,
             ctx: ctx.clone(),
+            bucket: None,
         };
 
         this.next_query = Some(this.build_query(None));
         this.sessions = this.load_all_session();
+        this.get_bucket_info();
 
         this
     }
@@ -240,18 +245,14 @@ impl State {
                     }
                 },
                 Update::ViewObject(obj) => {
-                    self.get_object(obj.key());
+                    self.head_object(obj.key());
                     self.current_img = obj;
-                    ctx.request_repaint();
+                    self.is_preview = true;
                 }
                 Update::GetObject(result) => match result {
                     Ok(data) => {
-                        //TODO: show object
-                        let url = self.current_img.key().to_string();
-                        self.current_img.set_url(url.clone());
-                        self.images.add(&url, data);
-                        self.is_preview = true;
-                        ctx.request_repaint();
+                        //TODO: match file type
+                        self.images.add(&self.current_img.url(), data);
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -260,13 +261,24 @@ impl State {
                 },
                 Update::HeadObject(result) => match result {
                     Ok(headers) => {
-                        let url = self.get_signature_url(self.current_img.key());
-                        self.current_img.set_url(url);
+                        if let Ok(url) = self.get_signature_url(self.current_img.key(), 3600) {
+                            self.current_img.set_url(url);
+                        }
+                        tracing::debug!("current_img: {:?}", self.current_img);
                         if let Some(mint_type) = headers.get("content-type") {
                             self.current_img
                                 .set_mine_type(mint_type.to_str().unwrap().to_string());
                         }
-                        self.is_preview = true;
+                        self.get_current_object();
+                    }
+                    Err(err) => {
+                        self.status = Status::Idle(Route::List);
+                        self.err = Some(err.to_string());
+                    }
+                },
+                Update::BucketInfo(result) => match result {
+                    Ok(bucket) => {
+                        self.bucket = Some(bucket);
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -309,17 +321,36 @@ impl State {
         self.oss.as_ref().expect("Oss not initialized yet")
     }
 
-    pub fn get_signature_url(&self, name: &str) -> String {
-        self.oss().signature_url(name, None).unwrap()
+    pub fn bucket(&self) -> &Bucket {
+        self.bucket.as_ref().expect("Bucket not initialized yet")
+    }
+
+    pub fn bucket_is_private(&self) -> bool {
+        self.bucket().is_private()
+    }
+
+    pub fn get_signature_url(&self, name: &str, expire: i64) -> OssResult<String> {
+        if self.bucket_is_private() {
+            self.oss().signature_url(name, expire, None)
+        } else {
+            Ok(format!("{}/{name}", self.oss().get_bucket_url()))
+        }
     }
 
     pub fn get_thumb_url(&self, name: &str, size: u16) -> String {
-        let mut params = Params::new();
-        params.insert(
-            "x-oss-process".into(),
-            Some(format!("image/resize,w_{size}")),
-        );
-        self.oss().signature_url(name, Some(params)).unwrap()
+        if self.bucket_is_private() {
+            let mut params = Params::new();
+            params.insert(
+                "x-oss-process".into(),
+                Some(format!("image/resize,w_{size}")),
+            );
+            self.oss().signature_url(name, 3600, Some(params)).unwrap()
+        } else {
+            format!(
+                "{}/{name}?x-oss-process=image/resize,w_{size}",
+                self.oss().get_bucket_url(),
+            )
+        }
     }
 
     pub fn upload_file(&mut self) {
@@ -386,15 +417,23 @@ impl State {
         });
     }
 
-    pub fn get_object(&mut self, name: &str) {
+    pub fn get_current_object(&mut self) {
         // self.status = Status::Busy(Route::List);
 
         // let name = format!("{}{}", self.current_path, name);
-        let name = name.to_string();
+        let name = self.current_img.key().to_string();
 
         spawn_evs!(self, |evs, client, ctx| {
             let res = client.get_object(name).await;
             evs.send(Update::GetObject(res)).unwrap();
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn get_bucket_info(&mut self) {
+        spawn_evs!(self, |evs, client, ctx| {
+            let res = client.get_bucket_info().await;
+            evs.send(Update::BucketInfo(res)).unwrap();
             ctx.request_repaint();
         });
     }
@@ -482,6 +521,7 @@ impl State {
         self.current_path = current_path.clone();
         self.navigator.push(current_path);
         self.oss = Some(client);
+        self.get_bucket_info();
         self.refresh();
         self.setting.auto_login = true;
         self.sessions = self.load_all_session();
@@ -511,6 +551,18 @@ impl State {
                 }
                 ConfirmAction::RemoveFiles => {
                     self.delete_multi_object();
+                }
+                ConfirmAction::GenerateUrl(expire) => {
+                    tracing::debug!("ConfirmAction::GenerateUrl({expire})");
+                    let name = self.current_img.key();
+                    let result = self.get_signature_url(name, expire);
+                    match result {
+                        Ok(url) => {
+                            self.current_img.set_url(url.clone());
+                            self.images.replace(self.current_img.key(), &url);
+                        }
+                        Err(err) => self.err = Some(err.to_string()),
+                    }
                 }
             }
         }

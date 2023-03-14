@@ -1,6 +1,8 @@
 use crate::state::State;
 use egui::Vec2;
 
+use super::confirm::ConfirmAction;
+
 #[derive(PartialEq)]
 pub enum ZoomType {
     In,
@@ -72,6 +74,8 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                         ui.centered_and_justified(|ui| {
                             img.show_size(ui, size);
                         });
+                    } else {
+                        ui.centered_and_justified(|ui| ui.spinner());
                     }
                 });
 
@@ -112,11 +116,22 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                         zoom_action(win_size, state, ZoomType::Out);
                     }
                 });
-                let mut url = state.current_img.url();
-                let resp = ui.add(egui::TextEdit::singleline(&mut url));
-                if resp.on_hover_text("Click to copy").clicked() {
-                    ui.output_mut(|o| o.copied_text = url.to_string());
-                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let mut url = state.current_img.url();
+                    if ui.button("Copy").clicked() {
+                        ui.output_mut(|o| o.copied_text = url.to_string());
+                        state.toasts.success("Copied!");
+                    }
+                    if state.bucket_is_private() {
+                        if ui.button("Generate").clicked() {
+                            state.confirm.prompt(
+                                "Please enter the link expiration (in seconds):",
+                                ConfirmAction::GenerateUrl(3600),
+                            );
+                        }
+                    }
+                    ui.add(egui::TextEdit::singleline(&mut url).desired_width(f32::INFINITY));
+                });
                 ui.horizontal(|ui| {
                     ui.label(format!(
                         "\u{1f5b4} Size: {}",

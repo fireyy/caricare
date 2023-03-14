@@ -229,3 +229,44 @@ impl Object {
         self.mine_type = mine_type;
     }
 }
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum BucketACL {
+    PublicReadWrite,
+    PublicRead,
+    #[default]
+    Private,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Bucket {
+    name: String,
+    grant: BucketACL,
+}
+
+impl Bucket {
+    pub fn new(name: String, grant: BucketACL) -> Self {
+        Bucket { name, grant }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn grant(&self) -> &BucketACL {
+        &self.grant
+    }
+
+    pub fn is_private(&self) -> bool {
+        self.grant == BucketACL::Private
+    }
+
+    pub fn from_str(text: &str) -> BucketACL {
+        match text {
+            "public-read-write" => BucketACL::PublicReadWrite,
+            "public-read" => BucketACL::PublicRead,
+            "private" => BucketACL::Private,
+            _ => BucketACL::Private,
+        }
+    }
+}

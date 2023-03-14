@@ -193,6 +193,12 @@ impl Cache {
             Err(_) => {}
         }
     }
+
+    pub fn replace(&mut self, old_key: &str, new_key: &str) {
+        if let Some(v) = self.map.remove(old_key) {
+            self.map.insert(new_key.to_string(), v);
+        }
+    }
 }
 
 #[derive(Clone)]

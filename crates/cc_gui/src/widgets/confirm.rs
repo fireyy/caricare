@@ -8,6 +8,7 @@ pub enum ConfirmAction {
     RemoveFile(Object),
     CreateFolder(String),
     RemoveFiles,
+    GenerateUrl(i64),
 }
 
 #[derive(Clone, PartialEq)]
@@ -68,6 +69,7 @@ impl Confirm {
                         .show(ui, |ui| {
                             ui.label(&self.message);
                             if self.c_type == ConfirmType::Prompt {
+                                // TODO: hint text
                                 ui.text_edit_singleline(&mut self.prompt);
                             }
                             ui.add_space(10.);
@@ -80,6 +82,11 @@ impl Confirm {
                                             ConfirmAction::CreateFolder(_) => {
                                                 final_action = ConfirmAction::CreateFolder(
                                                     self.prompt.clone(),
+                                                );
+                                            }
+                                            ConfirmAction::GenerateUrl(_) => {
+                                                final_action = ConfirmAction::GenerateUrl(
+                                                    self.prompt.parse::<i64>().unwrap(),
                                                 );
                                             }
                                             _ => {}

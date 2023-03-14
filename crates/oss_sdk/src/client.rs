@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::config::ClientConfig;
 use crate::conn::{Conn, UrlMaker};
-use crate::types::{Headers, ListObjects, Object, Params};
+use crate::types::{Bucket, BucketACL, Headers, ListObjects, Object, Params};
 use crate::util::{self, get_name};
 use crate::Result;
 use reqwest::header::HeaderMap;
@@ -45,6 +45,52 @@ impl Client {
 
         let bucket_url = url.replace("https://", &name);
         bucket_url
+    }
+
+    pub async fn get_bucket_info(&self) -> Result<Bucket> {
+        let mut query = Params::new();
+        query.insert("bucketInfo".into(), None);
+
+        let (data, _headers) = self
+            .do_request(reqwest::Method::GET, "", Some(query), None, vec![])
+            .await?;
+
+        let xml_str = std::str::from_utf8(&data)?;
+        tracing::debug!("XML: {}", xml_str);
+
+        let mut reader = Reader::from_str(xml_str);
+        reader.trim_text(true);
+
+        let bucket_info;
+        let mut bucket_name = String::new();
+        let mut grant = BucketACL::default();
+
+        loop {
+            match reader.read_event() {
+                Ok(Event::Start(ref e)) => match e.name().as_ref() {
+                    b"Name" => bucket_name = reader.read_text(e.to_end().name())?.to_string(),
+                    b"Grant" => {
+                        let text = reader.read_text(e.to_end().name())?;
+                        grant = Bucket::from_str(&text);
+                    }
+
+                    _ => (),
+                },
+
+                Ok(Event::End(ref e)) => match e.name().as_ref() {
+                    _ => (),
+                },
+
+                Ok(Event::Eof) => {
+                    bucket_info = Bucket::new(bucket_name, grant);
+                    break;
+                } // exits the loop when reaching end of file
+                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+                _ => (), // There are several other `Event`s we do not consider here
+            }
+        }
+
+        Ok(bucket_info)
     }
 
     pub async fn head_object(&self, object: impl AsRef<str>) -> Result<HeaderMap> {
@@ -118,7 +164,7 @@ impl Client {
 
     pub async fn list_v2(&self, query: Option<Params>) -> Result<ListObjects> {
         tracing::debug!("List object: {:?}", query);
-        let (resp, headers) = self
+        let (resp, _headers) = self
             .do_request(reqwest::Method::GET, "", query, None, vec![])
             .await?;
 
@@ -291,8 +337,13 @@ impl Client {
         Ok(results)
     }
 
-    pub fn signature_url(&self, object: &str, params: Option<Params>) -> Result<String> {
-        self.conn.signature_url(object, params)
+    pub fn signature_url(
+        &self,
+        object: &str,
+        expire: i64,
+        params: Option<Params>,
+    ) -> Result<String> {
+        self.conn.signature_url(object, expire, params)
     }
 
     async fn do_request(
