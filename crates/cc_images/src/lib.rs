@@ -184,6 +184,15 @@ impl Cache {
             self.map.insert(k, v);
         }
     }
+
+    pub fn add(&mut self, name: &str, data: Vec<u8>) {
+        match Loader::load(&name, data) {
+            Ok(img) => {
+                self.map.insert(name.to_string(), img);
+            }
+            Err(_) => {}
+        }
+    }
 }
 
 #[derive(Clone)]

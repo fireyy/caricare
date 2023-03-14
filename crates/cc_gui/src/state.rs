@@ -79,6 +79,7 @@ pub struct State {
     pub cc_ui: theme::CCUi,
     pub filter_str: String,
     pub selected_item: usize,
+    pub ctx: egui::Context,
 }
 
 impl State {
@@ -153,6 +154,7 @@ impl State {
             cc_ui,
             filter_str: String::new(),
             selected_item: 0,
+            ctx: ctx.clone(),
         };
 
         this.next_query = Some(this.build_query(None));
@@ -238,13 +240,18 @@ impl State {
                     }
                 },
                 Update::ViewObject(obj) => {
-                    // self.current_img = obj;
                     self.get_object(obj.key());
+                    self.current_img = obj;
+                    ctx.request_repaint();
                 }
                 Update::GetObject(result) => match result {
-                    Ok(headers) => {
+                    Ok(data) => {
                         //TODO: show object
+                        let url = self.current_img.key().to_string();
+                        self.current_img.set_url(url.clone());
+                        self.images.add(&url, data);
                         self.is_preview = true;
+                        ctx.request_repaint();
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -325,18 +332,20 @@ impl State {
 
         let dest = self.current_path.clone();
 
-        spawn_evs!(self, |evs, client| {
+        spawn_evs!(self, |evs, client, ctx| {
             let res = client.put_multi(picked_path, dest).await;
             evs.send(Update::Uploaded(res)).unwrap();
+            ctx.request_repaint();
         });
     }
 
     pub fn delete_object(&mut self, file: Object) {
         self.status = Status::Busy(Route::List);
 
-        spawn_evs!(self, |evs, client| {
+        spawn_evs!(self, |evs, client, ctx| {
             let res = client.delete_object(file.key()).await;
             evs.send(Update::Deleted(res)).unwrap();
+            ctx.request_repaint();
         });
     }
 
@@ -345,9 +354,10 @@ impl State {
 
         let files: Vec<Object> = self.list.iter().filter(|x| x.selected).cloned().collect();
 
-        spawn_evs!(self, |evs, client| {
+        spawn_evs!(self, |evs, client, ctx| {
             let res = client.delete_multi_object(files).await;
             evs.send(Update::Deleted(res)).unwrap();
+            ctx.request_repaint();
         });
     }
 
@@ -356,9 +366,10 @@ impl State {
 
         let name = format!("{}{}", self.current_path, name);
 
-        spawn_evs!(self, |evs, client| {
+        spawn_evs!(self, |evs, client, ctx| {
             let res = client.create_folder(name).await;
             evs.send(Update::CreateFolder(res)).unwrap();
+            ctx.request_repaint();
         });
     }
 
@@ -368,9 +379,10 @@ impl State {
         // let name = format!("{}{}", self.current_path, name);
         let name = name.to_string();
 
-        spawn_evs!(self, |evs, client| {
+        spawn_evs!(self, |evs, client, ctx| {
             let res = client.head_object(name).await;
             evs.send(Update::HeadObject(res)).unwrap();
+            ctx.request_repaint();
         });
     }
 
@@ -380,9 +392,10 @@ impl State {
         // let name = format!("{}{}", self.current_path, name);
         let name = name.to_string();
 
-        spawn_evs!(self, |evs, client| {
+        spawn_evs!(self, |evs, client, ctx| {
             let res = client.get_object(name).await;
             evs.send(Update::GetObject(res)).unwrap();
+            ctx.request_repaint();
         });
     }
 
@@ -394,9 +407,10 @@ impl State {
 
             let query = query.clone();
 
-            spawn_evs!(self, |evs, client| {
+            spawn_evs!(self, |evs, client, ctx| {
                 let res = client.list_v2(Some(query)).await;
                 evs.send(Update::List(res)).unwrap();
+                ctx.request_repaint();
             });
         }
     }
