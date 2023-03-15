@@ -94,6 +94,7 @@ impl State {
         };
 
         let mut oss = None;
+        let mut bucket = None;
 
         let (update_tx, update_rx) = mpsc::sync_channel(1);
         let (confirm_tx, confirm_rx) = mpsc::sync_channel(1);
@@ -117,6 +118,7 @@ impl State {
                 .build()
             {
                 Ok(client) => {
+                    bucket = Some(Bucket::default());
                     current_path = "".to_string();
                     oss = Some(client);
                     navigator.push(current_path.clone());
@@ -158,7 +160,7 @@ impl State {
             filter_str: String::new(),
             selected_item: 0,
             ctx: ctx.clone(),
-            bucket: None,
+            bucket,
         };
 
         this.next_query = Some(this.build_query(None));

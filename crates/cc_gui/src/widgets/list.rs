@@ -65,22 +65,6 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                                 .clicked()
                             {
                                 handle_click!(state, data);
-                                // match data.obj_type() {
-                                //     ObjectType::File => {
-                                //         state
-                                //             .update_tx
-                                //             .send(Update::ViewObject(data.clone()))
-                                //             .unwrap();
-                                //     }
-                                //     ObjectType::Folder => {
-                                //         state
-                                //             .update_tx
-                                //             .send(Update::Navgator(NavgatorType::New(
-                                //                 data.key().to_string(),
-                                //             )))
-                                //             .unwrap();
-                                //     }
-                                // }
                             }
                         });
                     });
@@ -113,22 +97,6 @@ pub fn thumb_ui(
                         let resp = item_ui(ui, &data, url.clone(), &mut state.images);
                         if resp.on_hover_text(d.name()).clicked() {
                             handle_click!(state, data);
-                            // match data.obj_type() {
-                            //     ObjectType::File => {
-                            //         state
-                            //             .update_tx
-                            //             .send(Update::ViewObject(data.clone()))
-                            //             .unwrap();
-                            //     }
-                            //     ObjectType::Folder => {
-                            //         state
-                            //             .update_tx
-                            //             .send(Update::Navgator(NavgatorType::New(
-                            //                 data.key().to_string(),
-                            //             )))
-                            //             .unwrap();
-                            //     }
-                            // }
                         }
                     }
                 }

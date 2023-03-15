@@ -169,7 +169,7 @@ impl Client {
             .await?;
 
         let xml_str = std::str::from_utf8(&resp)?;
-        tracing::debug!("XML: {}", xml_str);
+        // tracing::debug!("XML: {}", xml_str);
         let mut result = Vec::new();
         let mut reader = Reader::from_str(xml_str);
         reader.trim_text(true);

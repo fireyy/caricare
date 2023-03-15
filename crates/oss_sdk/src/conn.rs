@@ -157,7 +157,7 @@ impl Conn {
             .sign_query(&mut req, Duration::seconds(expire))
             .expect("sign request must success");
 
-        tracing::debug!("signature url: {}", req.url());
+        // tracing::debug!("signature url: {}", req.url());
 
         Ok(req.url().to_string())
     }
