@@ -301,6 +301,21 @@ impl Client {
         Ok(())
     }
 
+    pub async fn copy_object(&self, src: impl AsRef<str>, dest: impl AsRef<str>) -> Result<()> {
+        let src = src.as_ref();
+        let dest = dest.as_ref();
+        tracing::debug!("Copy object: {}", src);
+
+        let mut headers = Headers::new();
+        headers.insert("x-oss-copy-source".into(), src.to_string());
+
+        let _ = self
+            .do_request(reqwest::Method::PUT, &dest, None, Some(headers), vec![])
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn put(&self, path: PathBuf, dest: &str) -> Result<()> {
         let name = get_name(&path);
         let file_content = std::fs::read(path).unwrap();

@@ -49,6 +49,7 @@ pub enum Update {
     HeadObject(OssResult<HeaderMap>),
     GetObject(OssResult<Vec<u8>>),
     BucketInfo(OssResult<Bucket>),
+    Copied(OssResult<()>),
 }
 
 pub struct State {
@@ -83,6 +84,7 @@ pub struct State {
     pub selected_item: usize,
     pub ctx: egui::Context,
     pub bucket: Option<Bucket>,
+    pub copy_action: Option<String>,
 }
 
 impl State {
@@ -161,6 +163,7 @@ impl State {
             selected_item: 0,
             ctx: ctx.clone(),
             bucket,
+            copy_action: None,
         };
 
         this.next_query = Some(this.build_query(None));
@@ -281,6 +284,15 @@ impl State {
                 Update::BucketInfo(result) => match result {
                     Ok(bucket) => {
                         self.bucket = Some(bucket);
+                    }
+                    Err(err) => {
+                        self.status = Status::Idle(Route::List);
+                        self.err = Some(err.to_string());
+                    }
+                },
+                Update::Copied(result) => match result {
+                    Ok(_) => {
+                        self.refresh();
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -415,6 +427,16 @@ impl State {
         spawn_evs!(self, |evs, client, ctx| {
             let res = client.head_object(name).await;
             evs.send(Update::HeadObject(res)).unwrap();
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn copy_object(&mut self, src: String, dest: String) {
+        self.status = Status::Busy(Route::List);
+
+        spawn_evs!(self, |evs, client, ctx| {
+            let res = client.copy_object(src, dest).await;
+            evs.send(Update::Copied(res)).unwrap();
             ctx.request_repaint();
         });
     }
