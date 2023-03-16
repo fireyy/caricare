@@ -7,6 +7,7 @@ use crate::widgets::{
 use cc_core::{log::LogItem, store, tracing, MemoryHistory, Session, Setting};
 use cc_files::Cache as ImageCache;
 use egui_notify::Toasts;
+use oss_sdk::util::get_name_form_path;
 use oss_sdk::{
     Bucket, Client as OssClient, HeaderMap, ListObjects, Object, Params, Result as OssResult,
 };
@@ -51,9 +52,12 @@ pub enum Update {
     CreateFolder(OssResult<()>),
     ViewObject(Object),
     HeadObject(OssResult<HeaderMap>),
-    GetObject(OssResult<Vec<u8>>),
+    GetObject(OssResult<(String, Vec<u8>)>),
     BucketInfo(OssResult<Bucket>),
     Copied(OssResult<(String, bool)>),
+    DownloadObject(String),
+    Success(String),
+    Error(String),
 }
 
 pub struct State {
@@ -259,7 +263,7 @@ impl State {
                     self.is_preview = true;
                 }
                 Update::GetObject(result) => match result {
-                    Ok(data) => {
+                    Ok((_name, data)) => {
                         self.file_cache.add(&self.current_object.url(), data);
                     }
                     Err(err) => {
@@ -307,6 +311,15 @@ impl State {
                         self.logs.push(LogItem::copy().with_error(err.to_string()));
                     }
                 },
+                Update::DownloadObject(name) => {
+                    self.download_file(name);
+                }
+                Update::Success(result) => {
+                    self.toasts.success(result);
+                }
+                Update::Error(result) => {
+                    self.toasts.error(result);
+                }
             }
         }
 
@@ -612,5 +625,25 @@ impl State {
         }
 
         sessions
+    }
+
+    pub fn download_file(&self, name: String) {
+        let file_name = get_name_form_path(&name);
+        if let Some(path) = rfd::FileDialog::new().set_file_name(&file_name).save_file() {
+            spawn_evs!(self, |evs, client, ctx| {
+                let res = client.get_object(name).await;
+                if let Ok((_name, data)) = res {
+                    match std::fs::write(path, data) {
+                        Ok(_) => evs
+                            .send(Update::Success("Download success.".into()))
+                            .unwrap(),
+                        Err(_) => evs.send(Update::Error("Download failed.".into())).unwrap(),
+                    }
+                } else {
+                    evs.send(Update::Error("Download failed.".into())).unwrap();
+                }
+                ctx.request_repaint();
+            });
+        }
     }
 }

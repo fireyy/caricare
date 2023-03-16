@@ -38,10 +38,13 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                                 ConfirmAction::RemoveFile(data.clone()),
                             );
                         }
-                        //TODO：download file
-                        // if ui.button("\u{1f4e9}").on_hover_text("Download").clicked() {
-                        //     //
-                        // }
+                        // download file
+                        if ui.button("\u{1f4e9}").on_hover_text("Download").clicked() {
+                            state
+                                .update_tx
+                                .send(Update::DownloadObject(data.key().to_string()))
+                                .unwrap();
+                        }
                     });
                     egui::Frame::none().show(ui, |ui| {
                         ui.set_width(120.);

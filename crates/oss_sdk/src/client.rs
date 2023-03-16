@@ -104,13 +104,13 @@ impl Client {
         Ok(headers)
     }
 
-    pub async fn get_object(&self, object: impl AsRef<str>) -> Result<Vec<u8>> {
+    pub async fn get_object(&self, object: impl AsRef<str>) -> Result<(String, Vec<u8>)> {
         let object = object.as_ref();
         let (resp, _headers) = self
             .do_request(reqwest::Method::GET, object, None, None, vec![])
             .await?;
 
-        Ok(resp)
+        Ok((object.to_string(), resp))
     }
 
     pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<()> {
