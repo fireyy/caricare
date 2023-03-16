@@ -1,8 +1,9 @@
 use super::confirm::ConfirmAction;
 use super::location_bar_ui;
-use crate::state::{NavgatorType, Route, State, Status, Update};
+use crate::state::{FileAction, NavgatorType, Route, State, Status, Update};
 use crate::SUPPORT_EXTENSIONS;
 use cc_core::ShowType;
+use oss_sdk::util::{get_name, get_name_form_path};
 
 pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {
     let native_pixels_per_point = frame.info().native_pixels_per_point;
@@ -144,31 +145,86 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         }
                         ui.separator();
                         ui.add_enabled_ui(
-                            state.selected_item == 1 && state.copy_action.is_none(),
+                            state.selected_item == 1 && state.file_action.is_none(),
                             |ui| {
                                 if ui.button("\u{1f5d0} Copy").clicked() {
                                     if let Some(obj) = state.list.iter().find(|x| x.selected) {
-                                        state.copy_action = Some(obj.key().to_string());
+                                        state.file_action =
+                                            Some(FileAction::Copy(obj.key().to_string()));
                                     }
                                 }
-                                //TODO: Rename action
-                                // if ui.button("\u{270f} Rename").clicked() {
-                                //     //
-                                // }
+                                if ui.button("\u{1f4e5} Move").clicked() {
+                                    if let Some(obj) = state.list.iter().find(|x| x.selected) {
+                                        state.file_action =
+                                            Some(FileAction::Move(obj.key().to_string()));
+                                    }
+                                }
+                                if ui.button("\u{270f} Rename").clicked() {
+                                    if let Some(obj) = state.list.iter().find(|x| x.selected) {
+                                        state.confirm.prompt(
+                                            "Please enter a new file name:",
+                                            ConfirmAction::RenameObject((
+                                                obj.key().to_string(),
+                                                "".into(),
+                                            )),
+                                        )
+                                    }
+                                }
                             },
                         );
-                        ui.add_enabled_ui(state.selected_item > 0, |ui| {
-                            if ui.button("\u{1f5d1} Delete").clicked() {
-                                state.confirm.show(
-                                    "Do you confirm to delete selected items?",
-                                    ConfirmAction::RemoveFiles,
-                                )
-                            }
-                        });
-                        ui.add_visible_ui(state.copy_action.is_some(), |ui| {
-                            if ui.button("Paste Here").clicked() {
-                                //
-                            }
+                        ui.add_enabled_ui(
+                            state.selected_item > 0 && state.file_action.is_none(),
+                            |ui| {
+                                if ui.button("\u{1f5d1} Delete").clicked() {
+                                    state.confirm.show(
+                                        "Do you confirm to delete selected items?",
+                                        ConfirmAction::RemoveFiles,
+                                    )
+                                }
+                            },
+                        );
+                        ui.add_visible_ui(state.file_action.is_some(), |ui| {
+                            let text = match &state.file_action {
+                                Some(action) => match action {
+                                    FileAction::Copy(_) => "Paste",
+                                    FileAction::Move(_) => "Move",
+                                },
+                                None => "",
+                            };
+                            ui.horizontal(|ui| {
+                                if ui
+                                    .add(
+                                        egui::Button::new(text)
+                                            .fill(state.cc_ui.design_tokens.selection_color),
+                                    )
+                                    .on_hover_text("Paste to current directory")
+                                    .clicked()
+                                {
+                                    if let Some(action) = &state.file_action {
+                                        match action {
+                                            FileAction::Copy(src) => {
+                                                let dest = format!(
+                                                    "{}{}",
+                                                    state.current_path,
+                                                    get_name_form_path(&src)
+                                                );
+                                                state.copy_object(src.to_string(), dest, false);
+                                            }
+                                            FileAction::Move(src) => {
+                                                let dest = format!(
+                                                    "{}{}",
+                                                    state.current_path,
+                                                    get_name_form_path(&src)
+                                                );
+                                                state.copy_object(src.to_string(), dest, true);
+                                            }
+                                        }
+                                    }
+                                }
+                                if ui.button("\u{274c}").on_hover_text("Cancel").clicked() {
+                                    state.file_action = None;
+                                }
+                            });
                         });
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             let response = ui.add_sized(

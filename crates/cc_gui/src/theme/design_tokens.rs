@@ -11,6 +11,7 @@ pub struct DesignTokens {
     pub bottom_bar_stroke: egui::Stroke,
     pub bottom_bar_rounding: egui::Rounding,
     pub shadow_gradient_dark_start: egui::Color32,
+    pub selection_color: egui::Color32,
 }
 
 impl DesignTokens {
@@ -63,6 +64,7 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
         // egui_style.spacing.interact_size.y = font_size;
     }
 
+    let selection_color = Color32::from_rgb(0, 61, 161);
     let panel_bg_color = Color32::from_rgb(13, 16, 17);
     let floating_color = Color32::from_gray(38);
 
@@ -104,7 +106,7 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
         egui_style.visuals.widgets.open.expansion = 2.0;
     }
 
-    egui_style.visuals.selection.bg_fill = Color32::from_rgb(0, 61, 161);
+    egui_style.visuals.selection.bg_fill = selection_color;
 
     egui_style.visuals.widgets.noninteractive.bg_stroke.color = Color32::from_gray(30); // from figma. separator lines, panel lines, etc
 
@@ -162,6 +164,7 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
             se: 0.0,
         }, // copied from figma, should be top only
         shadow_gradient_dark_start: egui::Color32::from_black_alpha(77),
+        selection_color,
     }
 }
 

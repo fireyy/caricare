@@ -301,19 +301,27 @@ impl Client {
         Ok(())
     }
 
-    pub async fn copy_object(&self, src: impl AsRef<str>, dest: impl AsRef<str>) -> Result<()> {
+    pub async fn copy_object(
+        &self,
+        src: impl AsRef<str>,
+        dest: impl AsRef<str>,
+        is_move: bool,
+    ) -> Result<(String, bool)> {
         let src = src.as_ref();
         let dest = dest.as_ref();
         tracing::debug!("Copy object: {}", src);
 
         let mut headers = Headers::new();
-        headers.insert("x-oss-copy-source".into(), src.to_string());
+        headers.insert(
+            "x-oss-copy-source".into(),
+            format!("/{}/{}", self.config.bucket, src),
+        );
 
         let _ = self
             .do_request(reqwest::Method::PUT, &dest, None, Some(headers), vec![])
             .await?;
 
-        Ok(())
+        Ok((src.to_string(), is_move))
     }
 
     pub async fn put(&self, path: PathBuf, dest: &str) -> Result<()> {

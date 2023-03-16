@@ -39,6 +39,11 @@ pub enum NavgatorType {
     New(String),
 }
 
+pub enum FileAction {
+    Copy(String),
+    Move(String),
+}
+
 pub enum Update {
     Uploaded(OssResult<Vec<String>>),
     List(OssResult<ListObjects>),
@@ -49,7 +54,7 @@ pub enum Update {
     HeadObject(OssResult<HeaderMap>),
     GetObject(OssResult<Vec<u8>>),
     BucketInfo(OssResult<Bucket>),
-    Copied(OssResult<()>),
+    Copied(OssResult<(String, bool)>),
 }
 
 pub struct State {
@@ -84,7 +89,8 @@ pub struct State {
     pub selected_item: usize,
     pub ctx: egui::Context,
     pub bucket: Option<Bucket>,
-    pub copy_action: Option<String>,
+    //TODO: support move and rename action
+    pub file_action: Option<FileAction>,
 }
 
 impl State {
@@ -163,7 +169,7 @@ impl State {
             selected_item: 0,
             ctx: ctx.clone(),
             bucket,
-            copy_action: None,
+            file_action: None,
         };
 
         this.next_query = Some(this.build_query(None));
@@ -189,7 +195,8 @@ impl State {
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::Upload);
-                        self.err = Some(err.to_string());
+                        self.logs
+                            .push(LogItem::upload().with_error(err.to_string()));
                     }
                 },
                 Update::List(result) => match result {
@@ -230,18 +237,17 @@ impl State {
                 Update::Deleted(result) => match result {
                     Ok(_) => {
                         //
-                        self.toasts.success("Delete Successed");
                         self.refresh();
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
-                        self.err = Some(err.to_string());
+                        self.logs
+                            .push(LogItem::delete().with_error(err.to_string()));
                     }
                 },
                 Update::CreateFolder(result) => match result {
                     Ok(_) => {
                         //
-                        self.toasts.success("Create Successed");
                         self.refresh();
                     }
                     Err(err) => {
@@ -291,12 +297,17 @@ impl State {
                     }
                 },
                 Update::Copied(result) => match result {
-                    Ok(_) => {
+                    Ok((file, is_move)) => {
+                        self.file_action = None;
+                        if is_move {
+                            self.delete_object(file);
+                        }
                         self.refresh();
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
-                        self.err = Some(err.to_string());
+                        self.toasts.error("Copy failed.");
+                        self.logs.push(LogItem::copy().with_error(err.to_string()));
                     }
                 },
             }
@@ -384,11 +395,11 @@ impl State {
         });
     }
 
-    pub fn delete_object(&mut self, file: Object) {
+    pub fn delete_object(&mut self, file: String) {
         self.status = Status::Busy(Route::List);
 
         spawn_evs!(self, |evs, client, ctx| {
-            let res = client.delete_object(file.key()).await;
+            let res = client.delete_object(file).await;
             evs.send(Update::Deleted(res)).unwrap();
             ctx.request_repaint();
         });
@@ -431,11 +442,11 @@ impl State {
         });
     }
 
-    pub fn copy_object(&mut self, src: String, dest: String) {
+    pub fn copy_object(&mut self, src: String, dest: String, is_move: bool) {
         self.status = Status::Busy(Route::List);
 
         spawn_evs!(self, |evs, client, ctx| {
-            let res = client.copy_object(src, dest).await;
+            let res = client.copy_object(src, dest, is_move).await;
             evs.send(Update::Copied(res)).unwrap();
             ctx.request_repaint();
         });
@@ -568,7 +579,7 @@ impl State {
                     self.sessions = self.load_all_session();
                 }
                 ConfirmAction::RemoveFile(obj) => {
-                    self.delete_object(obj);
+                    self.delete_object(obj.key().to_string());
                 }
                 ConfirmAction::CreateFolder(name) => {
                     self.create_folder(name);
@@ -587,6 +598,10 @@ impl State {
                         }
                         Err(err) => self.err = Some(err.to_string()),
                     }
+                }
+                ConfirmAction::RenameObject((src, name)) => {
+                    let dest = format!("{}{}", self.current_path, name);
+                    self.copy_object(src, dest, true);
                 }
             }
         }

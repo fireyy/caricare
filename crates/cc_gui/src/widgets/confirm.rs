@@ -9,6 +9,7 @@ pub enum ConfirmAction {
     CreateFolder(String),
     RemoveFiles,
     GenerateUrl(i64),
+    RenameObject((String, String)),
 }
 
 #[derive(Clone, PartialEq)]
@@ -88,6 +89,12 @@ impl Confirm {
                                                 final_action = ConfirmAction::GenerateUrl(
                                                     self.prompt.parse::<i64>().unwrap(),
                                                 );
+                                            }
+                                            ConfirmAction::RenameObject((src, _)) => {
+                                                final_action = ConfirmAction::RenameObject((
+                                                    src.to_string(),
+                                                    self.prompt.clone(),
+                                                ));
                                             }
                                             _ => {}
                                         }

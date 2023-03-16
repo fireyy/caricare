@@ -14,7 +14,7 @@ pub fn get_name(path: &PathBuf) -> String {
         .to_string()
 }
 
-pub(crate) fn get_name_form_path(path: &str) -> String {
+pub fn get_name_form_path(path: &str) -> String {
     path.split('/')
         .filter(|k| !k.is_empty())
         .last()

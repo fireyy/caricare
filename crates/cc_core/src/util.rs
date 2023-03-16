@@ -16,13 +16,6 @@ pub fn get_extension(path: &PathBuf) -> String {
         .to_string()
 }
 
-pub fn get_name(path: &PathBuf) -> String {
-    path.file_name()
-        .and_then(OsStr::to_str)
-        .unwrap()
-        .to_string()
-}
-
 pub fn is_vaild_img(str: &String) -> bool {
     regex!(r"(?i)^(.*)(\.png|\.jpg|\.svg|\.gif)$").is_match(&str)
 }

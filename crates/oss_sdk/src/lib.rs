@@ -8,7 +8,7 @@ mod config;
 mod conn;
 mod error;
 mod types;
-mod util;
+pub mod util;
 mod version;
 
 pub use client::Client;

@@ -1,6 +1,8 @@
 #[derive(Default, Debug)]
 pub enum LogType {
     Upload,
+    Copy,
+    Delete,
     #[default]
     Unkown,
 }
@@ -33,6 +35,20 @@ impl LogItem {
     pub fn upload() -> Self {
         Self {
             log_type: LogType::Upload,
+            ..Default::default()
+        }
+    }
+
+    pub fn copy() -> Self {
+        Self {
+            log_type: LogType::Copy,
+            ..Default::default()
+        }
+    }
+
+    pub fn delete() -> Self {
+        Self {
+            log_type: LogType::Delete,
             ..Default::default()
         }
     }
