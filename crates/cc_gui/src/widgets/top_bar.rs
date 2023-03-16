@@ -229,12 +229,9 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     .hint_text("Filter with file name")
                                     .lock_focus(false),
                             );
-                            //TODO: use CommandPalette
-                            if !state.filter_str.is_empty() {
-                                response.request_focus();
-                            }
 
                             if response.changed() {
+                                response.request_focus();
                                 state.filter();
                             }
                         });
