@@ -1,5 +1,5 @@
 [package]
-name = "cc_images"
+name = "cc_files"
 version = "0.1.0"
 edition = "2021"
 
@@ -15,3 +15,5 @@ egui = { workspace = true }
 cc_runtime = { workspace = true }
 tokio = "1.22.0"
 anyhow = "1.0.66"
+serde = { workspace = true }
+enum-map = { version = "2", features = ["serde"] }

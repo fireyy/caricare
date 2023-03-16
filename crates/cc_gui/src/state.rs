@@ -2,11 +2,10 @@ use crate::spawn_evs;
 use crate::theme;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
-    image_view_ui, log_panel_ui,
+    file_view_ui, log_panel_ui,
 };
-use crate::SUPPORT_EXTENSIONS;
-use cc_core::{log::LogItem, store, tracing, util::get_extension, MemoryHistory, Session, Setting};
-use cc_images::Cache as ImageCache;
+use cc_core::{log::LogItem, store, tracing, MemoryHistory, Session, Setting};
+use cc_files::Cache as ImageCache;
 use egui_notify::Toasts;
 use oss_sdk::{
     Bucket, Client as OssClient, HeaderMap, ListObjects, Object, Params, Result as OssResult,
@@ -60,7 +59,7 @@ pub enum Update {
 pub struct State {
     pub oss: Option<OssClient>,
     pub list: Vec<Object>,
-    pub current_img: Object,
+    pub current_object: Object,
     pub update_tx: mpsc::SyncSender<Update>,
     pub update_rx: mpsc::Receiver<Update>,
     pub confirm_rx: mpsc::Receiver<ConfirmAction>,
@@ -71,7 +70,7 @@ pub struct State {
     pub loading_more: bool,
     pub next_query: Option<Params>,
     pub scroll_top: bool,
-    pub images: ImageCache,
+    pub file_cache: ImageCache,
     pub logs: Vec<LogItem>,
     pub is_show_result: bool,
     pub current_path: String,
@@ -89,7 +88,6 @@ pub struct State {
     pub selected_item: usize,
     pub ctx: egui::Context,
     pub bucket: Option<Bucket>,
-    //TODO: support move and rename action
     pub file_action: Option<FileAction>,
 }
 
@@ -140,7 +138,7 @@ impl State {
         let mut this = Self {
             setting,
             oss,
-            current_img: Object::default(),
+            current_object: Object::default(),
             list: vec![],
             update_tx,
             update_rx,
@@ -152,7 +150,7 @@ impl State {
             loading_more: false,
             next_query: None,
             scroll_top: false,
-            images,
+            file_cache: images,
             logs: vec![],
             is_show_result: false,
             current_path: current_path.clone(),
@@ -180,7 +178,7 @@ impl State {
     }
 
     pub fn init(&mut self, ctx: &egui::Context) {
-        self.images.poll();
+        self.file_cache.poll();
         self.init_confirm(ctx);
         self.selected_item = self.list.iter().filter(|x| x.selected).count();
         while let Ok(update) = self.update_rx.try_recv() {
@@ -257,13 +255,12 @@ impl State {
                 },
                 Update::ViewObject(obj) => {
                     self.head_object(obj.key());
-                    self.current_img = obj;
+                    self.current_object = obj;
                     self.is_preview = true;
                 }
                 Update::GetObject(result) => match result {
                     Ok(data) => {
-                        //TODO: match file type
-                        self.images.add(&self.current_img.url(), data);
+                        self.file_cache.add(&self.current_object.url(), data);
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -272,12 +269,12 @@ impl State {
                 },
                 Update::HeadObject(result) => match result {
                     Ok(headers) => {
-                        if let Ok(url) = self.get_signature_url(self.current_img.key(), 3600) {
-                            self.current_img.set_url(url);
+                        if let Ok(url) = self.get_signature_url(self.current_object.key(), 3600) {
+                            self.current_object.set_url(url);
                         }
-                        tracing::debug!("current_img: {:?}", self.current_img);
+                        tracing::debug!("current_img: {:?}", self.current_object);
                         if let Some(mint_type) = headers.get("content-type") {
-                            self.current_img
+                            self.current_object
                                 .set_mine_type(mint_type.to_str().unwrap().to_string());
                         }
                         self.get_current_object();
@@ -319,9 +316,7 @@ impl State {
             self.dropped_files = vec![];
             for file in dropped_files {
                 if let Some(path) = &file.path {
-                    if SUPPORT_EXTENSIONS.contains(&get_extension(&path).as_str()) {
-                        files.push(path.clone());
-                    }
+                    files.push(path.clone());
                 }
             }
 
@@ -335,7 +330,7 @@ impl State {
         }
 
         if self.oss.is_some() {
-            image_view_ui(ctx, self);
+            file_view_ui(ctx, self);
             log_panel_ui(ctx, self);
         }
 
@@ -456,7 +451,7 @@ impl State {
         // self.status = Status::Busy(Route::List);
 
         // let name = format!("{}{}", self.current_path, name);
-        let name = self.current_img.key().to_string();
+        let name = self.current_object.key().to_string();
 
         spawn_evs!(self, |evs, client, ctx| {
             let res = client.get_object(name).await;
@@ -589,12 +584,12 @@ impl State {
                 }
                 ConfirmAction::GenerateUrl(expire) => {
                     tracing::debug!("ConfirmAction::GenerateUrl({expire})");
-                    let name = self.current_img.key();
+                    let name = self.current_object.key();
                     let result = self.get_signature_url(name, expire);
                     match result {
                         Ok(url) => {
-                            self.current_img.set_url(url.clone());
-                            self.images.replace(self.current_img.key(), &url);
+                            self.current_object.set_url(url.clone());
+                            self.file_cache.replace(self.current_object.key(), &url);
                         }
                         Err(err) => self.err = Some(err.to_string()),
                     }

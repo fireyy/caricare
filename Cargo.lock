@@ -524,11 +524,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc_files"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cc_runtime",
+ "egui",
+ "egui_extras",
+ "enum-map",
+ "flume",
+ "image",
+ "reqwest",
+ "serde",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "cc_gui"
 version = "0.1.0"
 dependencies = [
  "cc_core",
- "cc_images",
+ "cc_files",
  "cc_runtime",
  "eframe",
  "egui",
@@ -538,21 +555,6 @@ dependencies = [
  "rfd",
  "serde",
  "tracing",
-]
-
-[[package]]
-name = "cc_images"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cc_runtime",
- "egui",
- "egui_extras",
- "flume",
- "image",
- "reqwest",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -1001,6 +1003,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9852635589dc9f9ea1b6fe9f05b50ef208c85c834a562f0c6abb1c475736ec2b"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "enum-map"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "988f0d17a0fa38291e5f41f71ea8d46a5d5497b9054d5a759fae2cbb819f2356"
+dependencies = [
+ "enum-map-derive",
+ "serde",
+]
+
+[[package]]
+name = "enum-map-derive"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a4da76b3b6116d758c7ba93f7ec6a35d2e2cf24feda76c6e38a375f4d5c59f2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

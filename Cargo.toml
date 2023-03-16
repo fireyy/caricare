@@ -38,7 +38,7 @@ cc_core = { path = "crates/cc_core" }
 cc_gui = { path = "crates/cc_gui" }
 oss_sdk = { path = "crates/oss_sdk" }
 cc_runtime = { path = "crates/cc_runtime" }
-cc_images = { path = "crates/cc_images" }
+cc_files = { path = "crates/cc_files" }
 eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
 egui = "0.21.0"
 serde = { version = "1", features = ["derive"] }

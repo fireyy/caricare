@@ -40,8 +40,8 @@ fn zoom_action(win_size: egui::Vec2, state: &mut State, zoom_type: ZoomType) {
     }
 }
 
-pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
-    if state.current_img.key().is_empty() || !state.current_img.is_file() {
+pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
+    if state.current_object.key().is_empty() || !state.current_object.is_file() {
         return;
     }
 
@@ -64,16 +64,20 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                 .auto_shrink([false; 2])
                 .max_height(win_size.y - 110.0)
                 .show(ui, |ui| {
-                    if let Some(img) = state.images.get(&state.current_img.url()) {
-                        let mut size = img.size_vec2();
-                        size = if state.img_zoom != 1.0 {
-                            size * state.img_zoom
+                    if let Some(file) = state.file_cache.get(&state.current_object.url()) {
+                        if file.is_image() {
+                            let mut size = file.size_vec2();
+                            size = if state.img_zoom != 1.0 {
+                                size * state.img_zoom
+                            } else {
+                                size * (ui.available_width() / size.x).min(1.0)
+                            };
+                            ui.centered_and_justified(|ui| {
+                                file.show_size(ui, size);
+                            });
                         } else {
-                            size * (ui.available_width() / size.x).min(1.0)
-                        };
-                        ui.centered_and_justified(|ui| {
-                            img.show_size(ui, size);
-                        });
+                            file.show(ui);
+                        }
                     } else {
                         ui.centered_and_justified(|ui| ui.spinner());
                     }
@@ -117,7 +121,7 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                     }
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let mut url = state.current_img.url();
+                    let mut url = state.current_object.url();
                     if ui.button("Copy").clicked() {
                         ui.output_mut(|o| o.copied_text = url.to_string());
                         state.toasts.success("Copied!");
@@ -135,11 +139,11 @@ pub fn image_view_ui(ctx: &egui::Context, state: &mut State) {
                 ui.horizontal(|ui| {
                     ui.label(format!(
                         "\u{1f5b4} Size: {}",
-                        state.current_img.size_string()
+                        state.current_object.size_string()
                     ));
                     ui.label(format!(
                         "\u{1f4c5} Last Modified: {}",
-                        state.current_img.date_string()
+                        state.current_object.date_string()
                     ));
                 });
             });

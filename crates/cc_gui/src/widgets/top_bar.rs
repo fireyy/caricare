@@ -1,9 +1,8 @@
 use super::confirm::ConfirmAction;
 use super::location_bar_ui;
 use crate::state::{FileAction, NavgatorType, Route, State, Status, Update};
-use crate::SUPPORT_EXTENSIONS;
 use cc_core::ShowType;
-use oss_sdk::util::{get_name, get_name_form_path};
+use oss_sdk::util::get_name_form_path;
 
 pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {
     let native_pixels_per_point = frame.info().native_pixels_per_point;
@@ -129,10 +128,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                     ui.horizontal(|ui| {
                         // upload button
                         if ui.button("\u{1f5c1} Upload").clicked() {
-                            if let Some(paths) = rfd::FileDialog::new()
-                                .add_filter("image", &SUPPORT_EXTENSIONS)
-                                .pick_files()
-                            {
+                            if let Some(paths) = rfd::FileDialog::new().pick_files() {
                                 state.picked_path = paths;
                             }
                         }

@@ -10,7 +10,7 @@ cc_core = { workspace = true }
 eframe = { workspace = true }
 serde = { workspace = true }
 egui = { workspace = true }
-cc_images = { workspace = true }
+cc_files = { workspace = true }
 cc_runtime = { workspace = true }
 egui_extras = "0.21.0"
 rfd = "0.10"

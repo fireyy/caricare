@@ -1,3 +1,6 @@
+mod file_format;
+mod syntax_highlighting;
+
 use std::{
     cell::Cell,
     collections::{HashMap, HashSet},
@@ -11,35 +14,64 @@ use egui_extras::RetainedImage;
 use image::ImageFormat;
 use tokio_stream::StreamExt as _;
 
-pub enum Image {
-    Static(RetainedImage),
-    Animated(Animated),
+use file_format::{guess_format, FileFormat};
+
+pub enum FileType {
+    StaticImage(RetainedImage),
+    AnimatedImage(Animated),
+    PlainText(Vec<u8>),
+    Unknown,
 }
 
-impl std::fmt::Debug for Image {
+impl std::fmt::Debug for FileType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Static(img) => f
+            Self::StaticImage(img) => f
                 .debug_struct("StaticImage")
                 .field("name", &img.debug_name())
                 .field("size", &img.size())
                 .finish(),
-            Self::Animated(img) => f
+            Self::AnimatedImage(img) => f
                 .debug_struct("AnimatedImage")
                 .field("frames", &img.frames.len())
                 .field("intervals", &img.intervals.len())
                 .finish(),
+            Self::PlainText(data) => f
+                .debug_struct("PlainText")
+                .field("size", &data.len())
+                .finish(),
+            _ => f.debug_struct("Unknown File").finish(),
         }
     }
 }
-impl Image {
+impl FileType {
+    pub fn is_image(&self) -> bool {
+        match self {
+            Self::StaticImage(_) | Self::AnimatedImage(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn show(&self, ui: &mut egui::Ui) -> egui::Response {
+        match self {
+            Self::PlainText(data) => {
+                if let Ok(text) = std::str::from_utf8(&data) {
+                    syntax_highlighting::code_view_ui(ui, text)
+                } else {
+                    ui.label("Parse error")
+                }
+            }
+            _ => ui.centered_and_justified(|ui| ui.label("Unknown")).inner,
+        }
+    }
+
     pub fn show_size(&self, ui: &mut egui::Ui, size: Vec2) -> egui::Response {
         match self {
-            Self::Static(image) => ui.add(
+            Self::StaticImage(image) => ui.add(
                 egui::Image::new(image.texture_id(ui.ctx()), size)
                     .sense(egui::Sense::hover().union(egui::Sense::click())),
             ),
-            Self::Animated(image) => {
+            Self::AnimatedImage(image) => {
                 let dt = ui.input(|i| i.stable_dt.min(0.1));
 
                 if let Some((img, delay)) = image.frame(dt) {
@@ -53,6 +85,14 @@ impl Image {
                 }
                 ui.allocate_response(size, egui::Sense::hover().union(egui::Sense::click()))
             }
+            Self::PlainText(data) => {
+                if let Ok(text) = std::str::from_utf8(&data) {
+                    syntax_highlighting::code_view_ui(ui, text)
+                } else {
+                    ui.label("Parse error")
+                }
+            }
+            _ => ui.label("Unknown"),
         }
     }
 
@@ -68,8 +108,9 @@ impl Image {
 
     pub fn size_vec2(&self) -> egui::Vec2 {
         match self {
-            Image::Static(img) => img.size_vec2(),
-            Image::Animated(_img) => egui::Vec2::new(1.0, 1.0), //TODO: Animated Size
+            FileType::StaticImage(img) => img.size_vec2(),
+            FileType::AnimatedImage(_img) => egui::Vec2::new(1.0, 1.0), //TODO: Animated Size
+            _ => egui::Vec2::default(),
         }
     }
 }
@@ -140,9 +181,11 @@ impl Animated {
             let pos = buf.position();
             buf.set_position(0);
 
-            let image =
-                Image::load_retained_image(&format!("{name}_{i}"), &buf.get_ref()[..pos as usize])
-                    .with_context(|| anyhow::anyhow!("cannot decode frame: {i}"))?;
+            let image = FileType::load_retained_image(
+                &format!("{name}_{i}"),
+                &buf.get_ref()[..pos as usize],
+            )
+            .with_context(|| anyhow::anyhow!("cannot decode frame: {i}"))?;
             frames.push(image);
             intervals.push(delay);
         }
@@ -157,7 +200,7 @@ impl Animated {
 }
 
 pub struct Cache {
-    map: HashMap<String, Image>,
+    map: HashMap<String, FileType>,
     loader: Loader,
 }
 
@@ -169,7 +212,7 @@ impl Cache {
         }
     }
 
-    pub fn get(&mut self, url: &str) -> Option<&Image> {
+    pub fn get(&mut self, url: &str) -> Option<&FileType> {
         match self.map.get(url) {
             Some(img) => Some(img),
             None => {
@@ -187,8 +230,8 @@ impl Cache {
 
     pub fn add(&mut self, name: &str, data: Vec<u8>) {
         match Loader::load(&name, data) {
-            Ok(img) => {
-                self.map.insert(name.to_string(), img);
+            Ok(file) => {
+                self.map.insert(name.to_string(), file);
             }
             Err(_) => {}
         }
@@ -204,7 +247,7 @@ impl Cache {
 #[derive(Clone)]
 struct Loader {
     submit: flume::Sender<String>,
-    produce: flume::Receiver<(String, Image)>,
+    produce: flume::Receiver<(String, FileType)>,
 }
 
 impl Loader {
@@ -259,40 +302,36 @@ impl Loader {
         resp.bytes().await.ok().map(|d| d.to_vec())
     }
 
-    fn load(name: &str, data: Vec<u8>) -> anyhow::Result<Image> {
-        // Check is svg
-        if guess_svg(&data[..data.len().min(128)]) {
-            Ok(Image::load_svg(name, &data).map(Image::Static)?)
-        } else {
-            let img = match image::guess_format(&data[..data.len().min(128)])
-                .map_err(|err| anyhow::anyhow!("cannot guess format for: '{name}': {err}"))?
-            {
-                ImageFormat::Png => {
+    fn load(name: &str, data: Vec<u8>) -> anyhow::Result<FileType> {
+        if let Some(format) = guess_format(&data[..data.len().min(128)]) {
+            let file = match format {
+                FileFormat::Png => {
                     let dec = image::codecs::png::PngDecoder::new(&*data).map_err(|err| {
                         anyhow::anyhow!("expected png, got something else for '{name}': {err}")
                     })?;
 
                     if dec.is_apng() {
-                        Animated::load_apng(name, &data).map(Image::Animated)?
+                        Animated::load_apng(name, &data).map(FileType::AnimatedImage)?
                     } else {
-                        Image::load_retained_image(name, &data).map(Image::Static)?
+                        FileType::load_retained_image(name, &data).map(FileType::StaticImage)?
                     }
                 }
-                ImageFormat::Jpeg => Image::load_retained_image(name, &data).map(Image::Static)?,
-                ImageFormat::Gif => Animated::load_gif(name, &data).map(Image::Animated)?,
+                FileFormat::Jpeg => {
+                    FileType::load_retained_image(name, &data).map(FileType::StaticImage)?
+                }
+                FileFormat::Gif => Animated::load_gif(name, &data).map(FileType::AnimatedImage)?,
                 // TODO determine if its animated?
-                ImageFormat::WebP => match data.get(44..48).filter(|bytes| bytes == b"ANMF") {
-                    Some(_) => Animated::load_webp(name, &data).map(Image::Animated)?,
-                    None => Image::load_retained_image(name, &data).map(Image::Static)?,
+                FileFormat::WebP => match data.get(44..48).filter(|bytes| bytes == b"ANMF") {
+                    Some(_) => Animated::load_webp(name, &data).map(FileType::AnimatedImage)?,
+                    None => {
+                        FileType::load_retained_image(name, &data).map(FileType::StaticImage)?
+                    }
                 },
-                fmt => anyhow::bail!("unsupported format for '{name}': {fmt:?}"),
+                FileFormat::Svg => FileType::load_svg(name, &data).map(FileType::StaticImage)?,
             };
-            Ok(img)
+            Ok(file)
+        } else {
+            Ok(FileType::PlainText(data))
         }
     }
-}
-
-fn guess_svg(buffer: &[u8]) -> bool {
-    buffer.starts_with(&[0x3c, 0x3f, 0x78, 0x6d, 0x6c])
-        || buffer.starts_with(&[0x3c, 0x73, 0x76, 0x67, 0x20])
 }

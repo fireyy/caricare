@@ -1,6 +1,6 @@
 // mod action_bar;
 pub mod confirm;
-mod image_view;
+mod file_view;
 mod item;
 pub mod list;
 mod location_bar;
@@ -10,7 +10,7 @@ mod status_bar;
 mod top_bar;
 
 // pub use action_bar::action_bar_ui;
-pub use image_view::image_view_ui;
+pub use file_view::file_view_ui;
 pub use item::item_ui;
 pub use location_bar::location_bar_ui;
 pub use log_panel::log_panel_ui;

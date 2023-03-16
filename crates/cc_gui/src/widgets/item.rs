@@ -1,6 +1,6 @@
 use crate::theme::text_ellipsis;
 use cc_core::util::is_vaild_img;
-use cc_images::Cache as ImageCache;
+use cc_files::Cache as FileCache;
 use egui::RichText;
 use oss_sdk::Object;
 
@@ -8,7 +8,7 @@ pub fn item_ui(
     ui: &mut egui::Ui,
     data: &Object,
     url: String,
-    images: &mut ImageCache,
+    images: &mut FileCache,
 ) -> egui::Response {
     let response = egui::Frame {
         inner_margin: egui::style::Margin::same(5.0),

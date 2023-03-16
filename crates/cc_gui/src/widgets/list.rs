@@ -94,7 +94,7 @@ pub fn thumb_ui(
                     if let Some(d) = state.list.get(j + i * num_cols) {
                         let url = state.get_thumb_url(&d.key(), 64);
                         let data = d.clone();
-                        let resp = item_ui(ui, &data, url.clone(), &mut state.images);
+                        let resp = item_ui(ui, &data, url.clone(), &mut state.file_cache);
                         if resp.on_hover_text(d.name()).clicked() {
                             handle_click!(state, data);
                         }
