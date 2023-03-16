@@ -70,8 +70,19 @@ impl Confirm {
                         .show(ui, |ui| {
                             ui.label(&self.message);
                             if self.c_type == ConfirmType::Prompt {
-                                // TODO: hint text
-                                ui.text_edit_singleline(&mut self.prompt);
+                                if let Some(action) = &self.action {
+                                    let hint_text = match action {
+                                        ConfirmAction::CreateFolder(d) => d.to_string(),
+                                        ConfirmAction::GenerateUrl(d) => d.to_string(),
+                                        ConfirmAction::RenameObject((name, _)) => name.to_string(),
+                                        _ => String::new(),
+                                    };
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.prompt)
+                                            .hint_text(hint_text),
+                                    );
+                                }
+                                // ui.text_edit_singleline(&mut self.prompt);
                             }
                             ui.add_space(10.);
                             ui.horizontal(|ui| {
