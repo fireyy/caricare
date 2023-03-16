@@ -1,13 +1,7 @@
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
-#[macro_export]
-macro_rules! regex {
-    ($re:literal $(,)?) => {{
-        static RE: once_cell::sync::OnceCell<regex::Regex> = once_cell::sync::OnceCell::new();
-        RE.get_or_init(|| regex::Regex::new($re).unwrap())
-    }};
-}
+static SUPPORT_IMG: [&str; 5] = [".png", ".jpg", ".svg", ".gif", ".webp"];
 
 pub fn get_extension(path: &PathBuf) -> String {
     path.extension()
@@ -17,5 +11,10 @@ pub fn get_extension(path: &PathBuf) -> String {
 }
 
 pub fn is_vaild_img(str: &String) -> bool {
-    regex!(r"(?i)^(.*)(\.png|\.jpg|\.svg|\.gif)$").is_match(&str)
+    for &a in &SUPPORT_IMG {
+        if str.ends_with(a) {
+            return true;
+        }
+    }
+    return false;
 }

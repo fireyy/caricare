@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 thiserror = "1.0"
 anyhow = "1.0"
-reqwest = { version = "0.11.13", default-features = false }
+reqwest = { workspace = true }
 quick-xml = "0.27"
 tracing = { workspace = true }
 bytesize = "1.1.0"
@@ -18,5 +18,5 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 md5 = "0.7.0"
 base64 = "0.20"
-infer = "0.11.0"
+infer = { workspace = true }
 time = { version = "0.3", features = ["macros", "formatting", "parsing"] }

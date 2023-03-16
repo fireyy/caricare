@@ -8,7 +8,7 @@ pub fn item_ui(
     ui: &mut egui::Ui,
     data: &Object,
     url: String,
-    images: &mut FileCache,
+    file_cache: &mut FileCache,
 ) -> egui::Response {
     let response = egui::Frame {
         inner_margin: egui::style::Margin::same(5.0),
@@ -27,9 +27,9 @@ pub fn item_ui(
                 ui.set_width(32.0);
                 ui.set_height(32.0);
                 if data.is_file() && is_vaild_img(&data.key().to_string()) {
-                    if let Some(img) = images.get(&url) {
+                    if let Some(file) = file_cache.get(&url) {
                         let size = egui::vec2(32.0, 32.0);
-                        img.show_size(ui, size);
+                        file.show_size(ui, size);
                     }
                 }
             });

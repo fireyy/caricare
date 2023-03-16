@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
 
+// TODO: use infer
 static MAGIC_BYTES: [(&[u8], FileFormat); 7] = [
     (b"\x89PNG\r\n\x1a\n", FileFormat::Png),
     (&[0xff, 0xd8, 0xff], FileFormat::Jpeg),

@@ -10,7 +10,6 @@ tracing = { workspace = true }
 tracing-subscriber = "0.3.0"
 anyhow = "1.0.66"
 once_cell = { workspace = true }
-regex = "1.7.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = "1"
