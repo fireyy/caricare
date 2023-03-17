@@ -158,7 +158,7 @@ impl State {
             file_cache: images,
             logs: vec![],
             is_show_result: false,
-            current_path: current_path.clone(),
+            current_path,
             navigator,
             confirm: Confirm::new(confirm_tx),
             session,
@@ -265,7 +265,7 @@ impl State {
                 }
                 Update::GetObject(result) => match result {
                     Ok((_name, data)) => {
-                        self.file_cache.add(&self.current_object.url(), data);
+                        self.file_cache.add(self.current_object.url(), data);
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -535,7 +535,7 @@ impl State {
     fn build_query(&self, next_token: Option<String>) -> Params {
         let mut path = self.current_path.clone();
         if !path.ends_with('/') && !path.is_empty() {
-            path.push_str("/");
+            path.push('/');
         }
         if !self.filter_str.is_empty() {
             path.push_str(&self.filter_str);
@@ -560,7 +560,7 @@ impl State {
             .bucket(&self.session.bucket)
             .build()?;
 
-        let _ = store::put_session(&self.session)?;
+        store::put_session(&self.session)?;
         let current_path = "".to_string();
         self.current_path = current_path.clone();
         self.navigator.push(current_path);

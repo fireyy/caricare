@@ -26,7 +26,7 @@ pub fn item_ui(
             .show(ui, |ui| {
                 ui.set_width(32.0);
                 ui.set_height(32.0);
-                if data.is_file() && is_vaild_img(&data.key().to_string()) {
+                if data.is_file() && is_vaild_img(data.key()) {
                     if let Some(file) = file_cache.get(&url) {
                         let size = egui::vec2(32.0, 32.0);
                         file.show_size(ui, size);

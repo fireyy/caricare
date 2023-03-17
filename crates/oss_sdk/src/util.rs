@@ -1,13 +1,12 @@
-#![allow(unreachable_code)]
 use std::ffi::OsStr;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::Path;
 
 use once_cell::sync::Lazy;
 
 use crate::Result;
 
-pub fn get_name(path: &PathBuf) -> String {
+pub fn get_name(path: &Path) -> String {
     path.file_name()
         .and_then(OsStr::to_str)
         .unwrap()
@@ -24,23 +23,23 @@ pub fn get_name_form_path(path: &str) -> String {
 
 pub(crate) fn check_bucket_name(name: &str) -> Result<()> {
     let len = name.len();
-    if len < 3 || len > 63 {
-        return bail!("bucket name {} len is between [3-63],now is {}", name, &len);
+    if !(3..=63).contains(&len) {
+        anyhow::bail!("bucket name {} len is between [3-63],now is {}", name, &len);
     }
     for ch in name.chars() {
-        let valid = ('a' <= ch && ch <= 'z') || ('0' <= ch && ch <= '9') || ch == '-';
+        let valid = ('a'..='z').contains(&ch) || ('0'..='9').contains(&ch) || ch == '-';
         if !valid {
-            return bail!(
+            anyhow::bail!(
                 "bucket name {} can only include lowercase letters, numbers, and -",
                 name
             );
         }
     }
 
-    if name.chars().nth(0).unwrap_or_default() == '-'
+    if name.chars().next().unwrap_or_default() == '-'
         || name.chars().last().unwrap_or_default() == '-'
     {
-        return bail!(
+        anyhow::bail!(
             "bucket name {} must start and end with a lowercase letter or number",
             name
         );
@@ -50,7 +49,7 @@ pub(crate) fn check_bucket_name(name: &str) -> Result<()> {
 
 pub(crate) fn query_escape(input: &str) -> String {
     let s = format!("k={input}");
-    s[2..].replace("+", "%20")
+    s[2..].replace('+', "%20")
 }
 
 pub(crate) struct SysInfo(String, String, String);

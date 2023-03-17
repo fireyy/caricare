@@ -54,8 +54,7 @@ impl Client {
         name.push_str(&name_str);
         name.push('.');
 
-        let bucket_url = url.replace("https://", &name);
-        bucket_url
+        url.replace("https://", &name)
     }
 
     pub async fn get_bucket_info(&self) -> Result<Bucket> {
@@ -82,15 +81,13 @@ impl Client {
                     b"Name" => bucket_name = reader.read_text(e.to_end().name())?.to_string(),
                     b"Grant" => {
                         let text = reader.read_text(e.to_end().name())?;
-                        grant = Bucket::from_str(&text);
+                        grant = Bucket::get_acl_from_str(&text);
                     }
 
                     _ => (),
                 },
 
-                Ok(Event::End(ref e)) => match e.name().as_ref() {
-                    _ => (),
-                },
+                Ok(Event::End(ref _e)) => {}
 
                 Ok(Event::Eof) => {
                     bucket_info = Bucket::new(bucket_name, grant);
@@ -149,7 +146,7 @@ impl Client {
         let result_clone = result.clone();
 
         let mut headers = Headers::new();
-        let len = result.len().to_string().to_owned();
+        let len = result.len().to_string();
         headers.insert("content-length".into(), len);
 
         let md5_digest = md5::compute(result.as_bytes());
@@ -204,7 +201,7 @@ impl Client {
         let mut is_common_pre = false;
         let mut prefix_vec = Vec::new();
 
-        let list_objects;
+        let mut list_objects;
 
         loop {
             match reader.read_event() {
@@ -226,12 +223,10 @@ impl Client {
                     b"StartAfter" => start_after = reader.read_text(e.name())?.to_string(),
                     b"MaxKeys" => max_keys = reader.read_text(e.name())?.to_string(),
                     b"Delimiter" => delimiter = reader.read_text(e.name())?.to_string(),
-                    b"IsTruncated" => {
-                        is_truncated = reader.read_text(e.name())?.to_string() == "true"
-                    }
+                    b"IsTruncated" => is_truncated = reader.read_text(e.name())? == "true",
                     b"NextContinuationToken" => {
                         let nc_token = reader.read_text(e.name())?.to_string();
-                        next_continuation_token = if nc_token.len() > 0 {
+                        next_continuation_token = if !nc_token.is_empty() {
                             Some(nc_token)
                         } else {
                             None
@@ -281,10 +276,11 @@ impl Client {
                         start_after,
                         max_keys,
                         is_truncated,
-                        next_continuation_token,
-                        result,
-                        prefix_vec,
                     );
+
+                    list_objects.set_next_continuation_token(next_continuation_token);
+                    list_objects.set_objects(result);
+                    list_objects.set_common_prefixes(prefix_vec);
                     break;
                 } // exits the loop when reaching end of file
                 Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
@@ -295,7 +291,7 @@ impl Client {
     }
 
     pub async fn create_folder(&self, path: String) -> Result<()> {
-        let path = if path.ends_with("/") {
+        let path = if path.ends_with('/') {
             path
         } else {
             format!("{path}/")
@@ -329,7 +325,7 @@ impl Client {
         );
 
         let _ = self
-            .do_request(reqwest::Method::PUT, &dest, None, Some(headers), vec![])
+            .do_request(reqwest::Method::PUT, dest, None, Some(headers), vec![])
             .await?;
 
         Ok((src.to_string(), is_move))
@@ -338,7 +334,7 @@ impl Client {
     pub async fn put(&self, path: PathBuf, dest: &str) -> Result<()> {
         let name = get_name(&path);
         let file_content = std::fs::read(path).unwrap();
-        let key = format!("{}{}", dest, name);
+        let key = format!("{dest}{name}");
         let content_length = file_content.len().to_string();
         let mut headers = Headers::new();
         headers.insert("content-length".into(), content_length);

@@ -23,7 +23,7 @@ impl Debug for dyn Credentials {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ListObjects {
     bucket_name: String,
     delimiter: String,
@@ -45,10 +45,6 @@ impl ListObjects {
         start_after: String,
         max_keys: String,
         is_truncated: bool,
-        next_continuation_token: Option<String>,
-
-        objects: Vec<Object>,
-        common_prefixes: Vec<Object>,
     ) -> Self {
         ListObjects {
             bucket_name,
@@ -57,10 +53,7 @@ impl ListObjects {
             start_after,
             max_keys,
             is_truncated,
-            next_continuation_token,
-
-            objects,
-            common_prefixes,
+            ..Default::default()
         }
     }
 
@@ -90,6 +83,18 @@ impl ListObjects {
 
     pub fn next_continuation_token(&self) -> &Option<String> {
         &self.next_continuation_token
+    }
+
+    pub fn set_next_continuation_token(&mut self, next_continuation_token: Option<String>) {
+        self.next_continuation_token = next_continuation_token;
+    }
+
+    pub fn set_objects(&mut self, objects: Vec<Object>) {
+        self.objects = objects;
+    }
+
+    pub fn set_common_prefixes(&mut self, common_prefixes: Vec<Object>) {
+        self.common_prefixes = common_prefixes;
     }
 }
 
@@ -261,7 +266,7 @@ impl Bucket {
         self.grant == BucketACL::Private
     }
 
-    pub fn from_str(text: &str) -> BucketACL {
+    pub fn get_acl_from_str(text: &str) -> BucketACL {
         match text {
             "public-read-write" => BucketACL::PublicReadWrite,
             "public-read" => BucketACL::PublicRead,

@@ -24,7 +24,7 @@ macro_rules! handle_click {
 }
 
 pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
-    egui::Grid::new(format!("list"))
+    egui::Grid::new("list".to_string())
         .num_columns(1)
         .striped(true)
         .show(ui, |ui| {
@@ -60,7 +60,7 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                             if ui
                                 .add(
                                     egui::Label::new(
-                                        state.cc_ui.text_ellipsis(&data.name().as_ref(), 1),
+                                        state.cc_ui.text_ellipsis(data.name().as_ref(), 1),
                                     )
                                     .sense(egui::Sense::click()),
                                 )
@@ -84,7 +84,7 @@ pub fn thumb_ui(
     num_cols: usize,
     col_width: f32,
 ) {
-    egui::Grid::new(format!("grid"))
+    egui::Grid::new("grid".to_string())
         .num_columns(num_cols)
         .max_col_width(col_width - 9.0)
         .min_col_width(THUMB_LIST_WIDTH - 9.0)
@@ -95,7 +95,7 @@ pub fn thumb_ui(
             for i in row_range {
                 for j in 0..num_cols {
                     if let Some(d) = state.list.get(j + i * num_cols) {
-                        let url = state.get_thumb_url(&d.key(), 64);
+                        let url = state.get_thumb_url(d.key(), 64);
                         let data = d.clone();
                         let resp = item_ui(ui, &data, url.clone(), &mut state.file_cache);
                         if resp.on_hover_text(d.name()).clicked() {

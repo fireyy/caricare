@@ -172,7 +172,7 @@ impl CCUi {
 }
 
 pub fn text_ellipsis(style: &egui::Style, name: &str, max_rows: usize) -> LayoutJob {
-    let font_id = egui::TextStyle::Body.resolve(&style);
+    let font_id = egui::TextStyle::Body.resolve(style);
     let color = style.visuals.text_color();
     let mut job =
         LayoutJob::single_section(name.to_string(), egui::TextFormat::simple(font_id, color));

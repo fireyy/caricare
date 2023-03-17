@@ -71,7 +71,7 @@ static DEFAULT_USER_AGENT: Lazy<String> = Lazy::new(|| {
     let arch = util::SYS_INFO.machine();
     let release = util::SYS_INFO.release();
 
-    format!("caricare/{} ({}/{}/{};)", VERSION, os, release, arch)
+    format!("caricare/{VERSION} ({os}/{release}/{arch};)")
 });
 
 impl Default for ClientConfig {
@@ -86,7 +86,7 @@ impl Default for ClientConfig {
             access_key_secret: Default::default(),
             bucket: Default::default(),
             retries: Default::default(),
-            ua: ua,
+            ua,
             debug: Default::default(),
             timeout: Duration::from_secs(60),
             security_token: Default::default(),

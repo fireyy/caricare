@@ -202,7 +202,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                                 let dest = format!(
                                                     "{}{}",
                                                     state.current_path,
-                                                    get_name_form_path(&src)
+                                                    get_name_form_path(src)
                                                 );
                                                 state.copy_object(src.to_string(), dest, false);
                                             }
@@ -210,7 +210,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                                 let dest = format!(
                                                     "{}{}",
                                                     state.current_path,
-                                                    get_name_form_path(&src)
+                                                    get_name_form_path(src)
                                                 );
                                                 state.copy_object(src.to_string(), dest, true);
                                             }

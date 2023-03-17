@@ -74,7 +74,7 @@ impl Conn {
         // handle body
         if !data.is_empty() && self.config.enable_md5 {
             // TODO: md5 threshold
-            let md5sum = format!("{}", base64::encode(md5::compute(&data).0));
+            let md5sum = base64::encode(md5::compute(&data).0);
             req.headers_mut().insert("content-md5", md5sum.parse()?);
         }
 
@@ -101,7 +101,7 @@ impl Conn {
             .sign(&mut req)
             .expect("sign request must success");
 
-        let resp = self.client.execute(req.try_into()?).await?;
+        let resp = self.client.execute(req).await?;
         let header = resp.headers().clone();
 
         let status_code = resp.status().as_u16();
@@ -110,12 +110,10 @@ impl Conn {
 
         if is_success {
             Ok((b, header))
+        } else if let Ok(e) = ServiceError::try_from_xml(&b) {
+            Err(OSSError::ServiceError(status_code, e.code, e.message, e.request_id).into())
         } else {
-            if let Ok(e) = ServiceError::try_from_xml(&b) {
-                Err(OSSError::ServiceError(status_code, e.code, e.message, e.request_id).into())
-            } else {
-                bail!("{}", String::from_utf8_lossy(&b))
-            }
+            bail!("{}", String::from_utf8_lossy(&b))
         }
     }
 
@@ -127,13 +125,13 @@ impl Conn {
                 result += "&";
             }
             if let Some(vv) = v {
-                result += &format!("{}={}", k, vv);
+                result += &format!("{k}={vv}");
             } else {
                 result += k;
             }
         }
 
-        Ok(result.replace("+", "%20"))
+        Ok(result.replace('+', "%20"))
     }
 
     pub(crate) fn signature_url(
@@ -162,6 +160,7 @@ impl Conn {
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone)]
 pub(crate) enum UrlType {
     CNAME,
@@ -180,7 +179,7 @@ impl UrlMaker {
     pub(crate) fn new(endpoint: &str, is_cname: bool) -> Result<UrlMaker> {
         let url = match Url::parse(endpoint) {
             Ok(u) => u,
-            Err(_) => Url::parse(&format!("http://{}", endpoint))?,
+            Err(_) => Url::parse(&format!("http://{endpoint}"))?,
         };
         let schema = url.scheme();
 
@@ -230,7 +229,7 @@ impl UrlMaker {
         match self.typ {
             UrlType::CNAME => {
                 let host = Cow::from(&self.net_loc[..]);
-                let path = Cow::from(format!("/{}", object));
+                let path = Cow::from(format!("/{object}"));
                 (host, path)
             }
             UrlType::IP => {
@@ -238,7 +237,7 @@ impl UrlMaker {
                 let path = if bucket.is_empty() {
                     Cow::from("/")
                 } else {
-                    Cow::from(format!("/{}/{}", bucket, object))
+                    Cow::from(format!("/{bucket}/{object}"))
                 };
                 (host, path)
             }
@@ -249,7 +248,7 @@ impl UrlMaker {
                     (host, path)
                 } else {
                     let host = Cow::from(format!("{}.{}", bucket, self.net_loc));
-                    let path = Cow::from(format!("/{}", object));
+                    let path = Cow::from(format!("/{object}"));
                     (host, path)
                 }
             }

@@ -112,6 +112,10 @@ impl MemoryHistory {
         self.inner.borrow().len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn can_go_back(&self) -> bool {
         self.inner.borrow().prev_len() > 1
     }
@@ -127,7 +131,7 @@ impl MemoryHistory {
     pub fn push<'a>(&self, route: impl Into<Cow<'a, str>>) {
         let route = route.into();
 
-        let location = route.to_string().into();
+        let location = route.to_string();
 
         self.inner.borrow_mut().push(location);
     }
@@ -135,7 +139,7 @@ impl MemoryHistory {
     pub fn replace<'a>(&self, route: impl Into<Cow<'a, str>>) {
         let route = route.into();
 
-        let location = route.to_string().into();
+        let location = route.to_string();
 
         self.inner.borrow_mut().replace(location);
     }

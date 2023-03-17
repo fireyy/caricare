@@ -43,16 +43,13 @@ impl std::fmt::Debug for FileType {
 }
 impl FileType {
     pub fn is_image(&self) -> bool {
-        match self {
-            Self::StaticImage(_) | Self::AnimatedImage(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::StaticImage(_) | Self::AnimatedImage(_))
     }
 
     pub fn show(&self, ui: &mut egui::Ui) -> egui::Response {
         match self {
             Self::PlainText(data) => {
-                if let Ok(text) = std::str::from_utf8(&data) {
+                if let Ok(text) = std::str::from_utf8(data) {
                     syntax_highlighting::code_view_ui(ui, text)
                 } else {
                     ui.label("Parse error")
@@ -83,7 +80,7 @@ impl FileType {
                 ui.allocate_response(size, egui::Sense::hover().union(egui::Sense::click()))
             }
             Self::PlainText(data) => {
-                if let Ok(text) = std::str::from_utf8(&data) {
+                if let Ok(text) = std::str::from_utf8(data) {
                     syntax_highlighting::code_view_ui(ui, text)
                 } else {
                     ui.label("Parse error")
@@ -240,11 +237,8 @@ impl Cache {
     pub fn add(&mut self, name: &str, data: Vec<u8>) {
         tracing::debug!("Add image: {name}");
         self.map.insert(name.to_string(), FileType::Unknown);
-        match Loader::load(&name, data) {
-            Ok(file) => {
-                self.map.insert(name.to_string(), file);
-            }
-            Err(_) => {}
+        if let Ok(file) = Loader::load(name, data) {
+            self.map.insert(name.to_string(), file);
         }
     }
 

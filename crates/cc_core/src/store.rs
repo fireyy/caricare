@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::{Path, PathBuf};
 
-static STORE: Lazy<ContentStore> = Lazy::new(|| ContentStore::default());
+static STORE: Lazy<ContentStore> = Lazy::new(ContentStore::default);
 
 pub fn set_local_config<T: Serialize>(name: &str, val: &T) {
     let config_path = STORE.config_dir().join(name);
@@ -33,7 +33,7 @@ pub fn get_all_session() -> Result<Vec<Session>, CoreError> {
     let mut sessions = vec![];
     for entry in std::fs::read_dir(STORE.sessions_dir())? {
         let entry = entry?;
-        if entry.file_name() != std::ffi::OsString::from("latest") {
+        if entry.file_name() != *"latest" {
             let path = entry.path();
             if let Some(session) = get_session_by_path(path.as_path()) {
                 sessions.push(session);

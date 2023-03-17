@@ -34,7 +34,7 @@ fn zoom_action(win_size: egui::Vec2, state: &mut State, zoom_type: ZoomType) {
     // limit scale
     if new_scale > 0.05 && new_scale < 40. {
         // We want to zoom towards the center
-        let center = Vec2::new(win_size.x as f32 / 2., win_size.y as f32 / 2.);
+        let center = Vec2::new(win_size.x / 2., win_size.y / 2.);
         state.offset -= scale_pt(state.offset, center, state.img_zoom, delta);
         state.img_zoom += delta;
     }
@@ -64,7 +64,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                 .auto_shrink([false; 2])
                 .max_height(win_size.y - 110.0)
                 .show(ui, |ui| {
-                    if let Some(file) = state.file_cache.check(&state.current_object.url()) {
+                    if let Some(file) = state.file_cache.check(state.current_object.url()) {
                         if file.is_image() {
                             let mut size = file.size_vec2();
                             size = if state.img_zoom != 1.0 {
@@ -126,13 +126,11 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                         ui.output_mut(|o| o.copied_text = url.to_string());
                         state.toasts.success("Copied!");
                     }
-                    if state.bucket_is_private() {
-                        if ui.button("Generate").clicked() {
-                            state.confirm.prompt(
-                                "Please enter the link expiration (in seconds):",
-                                ConfirmAction::GenerateUrl(3600),
-                            );
-                        }
+                    if state.bucket_is_private() && ui.button("Generate").clicked() {
+                        state.confirm.prompt(
+                            "Please enter the link expiration (in seconds):",
+                            ConfirmAction::GenerateUrl(3600),
+                        );
                     }
                     ui.add(egui::TextEdit::singleline(&mut url).desired_width(f32::INFINITY));
                 });

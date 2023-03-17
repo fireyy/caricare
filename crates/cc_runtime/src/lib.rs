@@ -68,10 +68,11 @@ where
 }
 
 type ResolverItem = Box<dyn std::any::Any + Send + Sync>;
+type PendingItem = Box<dyn FnMut() -> Option<(uuid::Uuid, ResolverItem)>>;
 
 #[derive(Default)]
 pub struct Resolver {
-    pending: Vec<Box<dyn FnMut() -> Option<(uuid::Uuid, ResolverItem)>>>,
+    pending: Vec<PendingItem>,
     resolved: HashMap<uuid::Uuid, ResolverItem>,
 }
 
