@@ -109,7 +109,7 @@ impl FileType {
     pub fn size_vec2(&self) -> egui::Vec2 {
         match self {
             FileType::StaticImage(img) => img.size_vec2(),
-            FileType::AnimatedImage(_img) => egui::Vec2::new(1.0, 1.0), //TODO: Animated Size
+            FileType::AnimatedImage(img) => img.size_vec2(),
             _ => egui::Vec2::default(),
         }
     }
@@ -158,6 +158,14 @@ impl Animated {
         use image::ImageDecoder as _;
         let dec = image::codecs::webp::WebPDecoder::new(data)?;
         Self::load_frames(name, dec.total_bytes() as _, dec)
+    }
+
+    pub fn size_vec2(&self) -> egui::Vec2 {
+        if let Some(img) = self.frames.get(0) {
+            img.size_vec2()
+        } else {
+            egui::Vec2::default()
+        }
     }
 
     fn load_frames<'a>(
