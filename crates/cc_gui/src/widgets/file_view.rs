@@ -64,7 +64,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                 .auto_shrink([false; 2])
                 .max_height(win_size.y - 110.0)
                 .show(ui, |ui| {
-                    if let Some(file) = state.file_cache.get(&state.current_object.url()) {
+                    if let Some(file) = state.file_cache.check(&state.current_object.url()) {
                         if file.is_image() {
                             let mut size = file.size_vec2();
                             size = if state.img_zoom != 1.0 {

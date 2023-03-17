@@ -1,3 +1,4 @@
+//! Adapted from https://github.com/emilk/egui/blob/master/crates/egui_demo_lib/src/syntax_highlighting.rs
 use egui::text::LayoutJob;
 
 /// View some code with syntax highlighting and selection.
@@ -64,14 +65,6 @@ impl Default for CodeTheme {
 }
 
 impl CodeTheme {
-    pub fn from_style(style: &egui::Style) -> Self {
-        if style.visuals.dark_mode {
-            Self::dark()
-        } else {
-            Self::light()
-        }
-    }
-
     pub fn from_memory(ctx: &egui::Context) -> Self {
         if ctx.style().visuals.dark_mode {
             ctx.data_mut(|d| {
@@ -83,14 +76,6 @@ impl CodeTheme {
                 d.get_persisted(egui::Id::new("light"))
                     .unwrap_or_else(CodeTheme::light)
             })
-        }
-    }
-
-    pub fn store_in_memory(self, ctx: &egui::Context) {
-        if self.dark_mode {
-            ctx.data_mut(|d| d.insert_persisted(egui::Id::new("dark"), self));
-        } else {
-            ctx.data_mut(|d| d.insert_persisted(egui::Id::new("light"), self));
         }
     }
 }
@@ -127,69 +112,6 @@ impl CodeTheme {
                 TokenType::Whitespace => TextFormat::simple(font_id.clone(), Color32::TRANSPARENT),
             ],
         }
-    }
-
-    pub fn ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal_top(|ui| {
-            let selected_id = egui::Id::null();
-            let mut selected_tt: TokenType =
-                ui.data_mut(|d| *d.get_persisted_mut_or(selected_id, TokenType::Comment));
-
-            ui.vertical(|ui| {
-                ui.set_width(150.0);
-                egui::widgets::global_dark_light_mode_buttons(ui);
-
-                ui.add_space(8.0);
-                ui.separator();
-                ui.add_space(8.0);
-
-                ui.scope(|ui| {
-                    for (tt, tt_name) in [
-                        (TokenType::Comment, "// comment"),
-                        (TokenType::Keyword, "keyword"),
-                        (TokenType::Literal, "literal"),
-                        (TokenType::StringLiteral, "\"string literal\""),
-                        (TokenType::Punctuation, "punctuation ;"),
-                        // (TokenType::Whitespace, "whitespace"),
-                    ] {
-                        let format = &mut self.formats[tt];
-                        ui.style_mut().override_font_id = Some(format.font_id.clone());
-                        ui.visuals_mut().override_text_color = Some(format.color);
-                        ui.radio_value(&mut selected_tt, tt, tt_name);
-                    }
-                });
-
-                let reset_value = if self.dark_mode {
-                    CodeTheme::dark()
-                } else {
-                    CodeTheme::light()
-                };
-
-                if ui
-                    .add_enabled(*self != reset_value, egui::Button::new("Reset theme"))
-                    .clicked()
-                {
-                    *self = reset_value;
-                }
-            });
-
-            ui.add_space(16.0);
-
-            ui.data_mut(|d| d.insert_persisted(selected_id, selected_tt));
-
-            egui::Frame::group(ui.style())
-                .inner_margin(egui::Vec2::splat(2.0))
-                .show(ui, |ui| {
-                    // ui.group(|ui| {
-                    ui.style_mut().override_text_style = Some(egui::TextStyle::Small);
-                    ui.spacing_mut().slider_width = 128.0; // Controls color picker size
-                    egui::widgets::color_picker::color_picker_color32(
-                        ui,
-                        &mut self.formats[selected_tt].color,
-                        egui::color_picker::Alpha::Opaque,
-                    );
-                });
-        });
     }
 }
 

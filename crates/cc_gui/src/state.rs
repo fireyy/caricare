@@ -64,6 +64,7 @@ pub struct State {
     pub oss: Option<OssClient>,
     pub list: Vec<Object>,
     pub current_object: Object,
+    //TODO: use crossbeam or flume
     pub update_tx: mpsc::SyncSender<Update>,
     pub update_rx: mpsc::Receiver<Update>,
     pub confirm_rx: mpsc::Receiver<ConfirmAction>,

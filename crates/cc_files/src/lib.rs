@@ -1,4 +1,3 @@
-mod file_format;
 mod syntax_highlighting;
 
 use std::{
@@ -13,8 +12,6 @@ use egui::Vec2;
 use egui_extras::RetainedImage;
 use image::ImageFormat;
 use tokio_stream::StreamExt as _;
-
-use file_format::{guess_format, FileFormat};
 
 pub enum FileType {
     StaticImage(RetainedImage),
@@ -230,6 +227,10 @@ impl Cache {
         }
     }
 
+    pub fn check(&mut self, url: &str) -> Option<&FileType> {
+        self.map.get(url)
+    }
+
     pub fn poll(&mut self) {
         for (k, v) in self.loader.produce.try_iter() {
             self.map.insert(k, v);
@@ -237,6 +238,8 @@ impl Cache {
     }
 
     pub fn add(&mut self, name: &str, data: Vec<u8>) {
+        tracing::debug!("Add image: {name}");
+        self.map.insert(name.to_string(), FileType::Unknown);
         match Loader::load(&name, data) {
             Ok(file) => {
                 self.map.insert(name.to_string(), file);
@@ -304,6 +307,7 @@ impl Loader {
         let resp = client.get(url).send().await.ok()?;
         if resp.status().as_u16() == 404 {
             // TODO report this
+            eprintln!("cannot fetch: {url}: 404 not found");
             return None;
         }
 
@@ -311,9 +315,10 @@ impl Loader {
     }
 
     fn load(name: &str, data: Vec<u8>) -> anyhow::Result<FileType> {
-        if let Some(format) = guess_format(&data[..data.len().min(128)]) {
-            let file = match format {
-                FileFormat::Png => {
+        if let Some(format) = infer::get(&data[..data.len().min(128)]) {
+            tracing::debug!("Load type: {:?}", format);
+            let file = match format.mime_type() {
+                "image/png" => {
                     let dec = image::codecs::png::PngDecoder::new(&*data).map_err(|err| {
                         anyhow::anyhow!("expected png, got something else for '{name}': {err}")
                     })?;
@@ -324,18 +329,22 @@ impl Loader {
                         FileType::load_retained_image(name, &data).map(FileType::StaticImage)?
                     }
                 }
-                FileFormat::Jpeg => {
+                "image/jpeg" => {
                     FileType::load_retained_image(name, &data).map(FileType::StaticImage)?
                 }
-                FileFormat::Gif => Animated::load_gif(name, &data).map(FileType::AnimatedImage)?,
-                // TODO determine if its animated?
-                FileFormat::WebP => match data.get(44..48).filter(|bytes| bytes == b"ANMF") {
-                    Some(_) => Animated::load_webp(name, &data).map(FileType::AnimatedImage)?,
+                "image/gif" => Animated::load_gif(name, &data).map(FileType::AnimatedImage)?,
+                // FIXME webp decode bug: https://github.com/image-rs/image/issues/1856
+                "image/webp" => match data.get(44..48).filter(|bytes| bytes == b"ANMF") {
+                    Some(_) => {
+                        tracing::debug!("animated webp");
+                        Animated::load_webp(name, &data).map(FileType::AnimatedImage)?
+                    }
                     None => {
                         FileType::load_retained_image(name, &data).map(FileType::StaticImage)?
                     }
                 },
-                FileFormat::Svg => FileType::load_svg(name, &data).map(FileType::StaticImage)?,
+                "image/svg+xml" => FileType::load_svg(name, &data).map(FileType::StaticImage)?,
+                _ => FileType::PlainText(data),
             };
             Ok(file)
         } else {

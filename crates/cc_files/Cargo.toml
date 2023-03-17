@@ -18,3 +18,4 @@ anyhow = "1.0.66"
 serde = { workspace = true }
 enum-map = { version = "2", features = ["serde"] }
 infer = { workspace = true }
+tracing = { workspace = true }
