@@ -23,13 +23,24 @@ impl Client {
     }
 
     fn new(config: ClientConfig) -> Result<Client> {
-        let client = reqwest::Client::builder()
-            .http1_only()
-            .timeout(config.timeout)
-            .build()?;
-
-        let um = UrlMaker::new(&config.endpoint, config.cname, config.http_proxy.is_some())?;
         let config = Arc::new(config);
+
+        let client;
+        let builder = reqwest::Client::builder()
+            .http1_only()
+            .timeout(config.timeout);
+
+        // http proxy
+        if let Some(http_proxy) = &config.http_proxy {
+            let user = http_proxy.user.to_owned().unwrap_or_default();
+            let pass = http_proxy.password.to_owned().unwrap_or_default();
+            let proxy = reqwest::Proxy::all(http_proxy.host.to_owned())?.basic_auth(&user, &pass);
+            client = builder.proxy(proxy).build()?;
+        } else {
+            client = builder.build()?;
+        }
+
+        let um = UrlMaker::new(&config.endpoint, config.cname)?;
         let conn = Conn::new(config.clone(), Arc::new(um), client)?;
 
         Ok(Client { conn, config })

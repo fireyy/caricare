@@ -80,9 +80,8 @@ impl Conn {
 
         if !data.is_empty() && self.config.enable_crc {
             // TODO: crc
+            tracing::debug!("CRC: {init_crc}");
         }
-
-        // TODO: http proxy
 
         // user-agent
         req.headers_mut()
@@ -175,11 +174,10 @@ pub(crate) struct UrlMaker {
     schema: String,
     net_loc: String,
     typ: UrlType,
-    is_proxy: bool,
 }
 
 impl UrlMaker {
-    pub(crate) fn new(endpoint: &str, is_cname: bool, is_proxy: bool) -> Result<UrlMaker> {
+    pub(crate) fn new(endpoint: &str, is_cname: bool) -> Result<UrlMaker> {
         let url = match Url::parse(endpoint) {
             Ok(u) => u,
             Err(_) => Url::parse(&format!("http://{}", endpoint))?,
@@ -201,7 +199,6 @@ impl UrlMaker {
                     };
 
                     Ok(UrlMaker {
-                        is_proxy,
                         schema: schema.into(),
                         net_loc: host.into(),
                         typ,

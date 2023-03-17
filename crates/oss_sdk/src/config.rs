@@ -57,7 +57,7 @@ pub(crate) struct ClientConfig {
     pub(crate) http_proxy: Option<HttpProxy>,
     pub(crate) enable_md5: bool,
     pub(crate) md5_threshold: i64, // bytes
-    pub(crate) enable_crc: bool,
+    pub(crate) enable_crc: bool,   //TODO: turn on CRC data check
     pub(crate) log_level: i8,
     pub(crate) upload_limit_speed: i64,
     pub(crate) credentials_provider: Option<Box<dyn Credentials>>,
