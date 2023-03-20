@@ -1,5 +1,6 @@
 use super::confirm::ConfirmAction;
 use crate::state::{Route, State, Status};
+use crate::theme::icon;
 
 pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe::Frame) {
     let frame = egui::Frame {
@@ -52,7 +53,7 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                     if ui
-                        .button(egui::RichText::new("\u{2386}").color(n_color))
+                        .button(egui::RichText::new(icon::USER).color(n_color))
                         .on_hover_text("Logout")
                         .clicked()
                     {
@@ -61,7 +62,7 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                             .show("Do you confirm to logout?", ConfirmAction::Logout);
                     }
                     if ui
-                        .button(egui::RichText::new("\u{1f4ac}").color(color))
+                        .button(egui::RichText::new(icon::LOG).color(color))
                         .on_hover_text("Logs")
                         .clicked()
                     {

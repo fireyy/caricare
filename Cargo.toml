@@ -16,7 +16,7 @@ osx_minimum_system_version = "10.12"
 
 [dependencies]
 cc_core = { workspace = true }
-cc_gui = { workspace = true }
+cc_gui = { workspace = true, features = ["lang-cjk"] }
 eframe = { workspace = true }
 cc_runtime = { workspace = true }
 

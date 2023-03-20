@@ -1,4 +1,5 @@
 mod design_tokens;
+pub mod icon;
 
 use design_tokens::DesignTokens;
 use eframe::epaint::text::{LayoutJob, TextWrapping};

@@ -2,6 +2,7 @@ use crate::state::State;
 use egui::Vec2;
 
 use super::confirm::ConfirmAction;
+use crate::theme::icon;
 
 #[derive(PartialEq)]
 pub enum ZoomType {
@@ -56,7 +57,11 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
         .frame(frame)
         .show_animated(ctx, state.is_preview, |ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                if ui.button("\u{274c}").on_hover_text("Close panel").clicked() {
+                if ui
+                    .button(icon::CLOSE)
+                    .on_hover_text("Close panel")
+                    .clicked()
+                {
                     state.is_preview = false;
                 }
             });
@@ -105,42 +110,51 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
             }
             ui.vertical_centered_justified(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label("\u{1f50d} Zoom: ");
-                    if ui.button("\u{2795}").on_hover_text("Zoom In").clicked() {
+                    ui.label("Zoom: ");
+                    if ui.button(icon::ZOOM_IN).on_hover_text("Zoom In").clicked() {
                         zoom_action(win_size, state, ZoomType::In);
                     }
                     if ui
-                        .button("\u{1f5d6}")
+                        .button(icon::ZOOM_ACTUAL)
                         .on_hover_text("Zoom to window size")
                         .clicked()
                     {
                         state.img_zoom = 1.0;
                     }
-                    if ui.button("\u{2796}").on_hover_text("Zoom Out").clicked() {
+                    if ui
+                        .button(icon::ZOOM_OUT)
+                        .on_hover_text("Zoom Out")
+                        .clicked()
+                    {
                         zoom_action(win_size, state, ZoomType::Out);
                     }
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let mut url = state.current_object.url();
-                    if ui.button("Copy").clicked() {
+                    if ui.button(format!("{} Copy", icon::CLIPBOARD)).clicked() {
                         ui.output_mut(|o| o.copied_text = url.to_string());
                         state.toasts.success("Copied!");
                     }
-                    if state.bucket_is_private() && ui.button("Generate").clicked() {
+                    if state.bucket_is_private()
+                        && ui.button(format!("{} Generate", icon::LINK)).clicked()
+                    {
                         state.confirm.prompt(
                             "Please enter the link expiration (in seconds):",
                             ConfirmAction::GenerateUrl(3600),
                         );
                     }
-                    ui.add(egui::TextEdit::singleline(&mut url).desired_width(f32::INFINITY));
+                    ui.add(egui::TextEdit::singleline(&mut url));
+                    ui.label(format!("{} Link:", icon::LINK));
                 });
                 ui.horizontal(|ui| {
                     ui.label(format!(
-                        "\u{1f5b4} Size: {}",
+                        "{} Size: {}",
+                        icon::SIZE,
                         state.current_object.size_string()
                     ));
                     ui.label(format!(
-                        "\u{1f4c5} Last Modified: {}",
+                        "{} Last Modified: {}",
+                        icon::DATE,
                         state.current_object.date_string()
                     ));
                 });

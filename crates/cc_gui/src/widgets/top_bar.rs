@@ -1,6 +1,7 @@
 use super::confirm::ConfirmAction;
 use super::location_bar_ui;
 use crate::state::{FileAction, NavgatorType, Route, State, Status, Update};
+use crate::theme::icon;
 use cc_core::ShowType;
 use oss_sdk::util::get_name_form_path;
 
@@ -22,7 +23,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         ui.add_space(top_bar_style.indent);
                         // Go to Back button
                         ui.add_enabled_ui(state.navigator.can_go_back(), |ui| {
-                            if ui.button("\u{2b05}").on_hover_text("Back").clicked() {
+                            if ui.button(icon::BACK).on_hover_text("Back").clicked() {
                                 state
                                     .update_tx
                                     .send(Update::Navgator(NavgatorType::Back))
@@ -31,11 +32,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         });
                         // Go to Parent button
                         ui.add_enabled_ui(!state.navigator.location().is_empty(), |ui| {
-                            if ui
-                                .button("\u{2b06}")
-                                .on_hover_text("Go to Parent")
-                                .clicked()
-                            {
+                            if ui.button(icon::TOP).on_hover_text("Go to Parent").clicked() {
                                 let mut parent = String::from("");
                                 let mut current = state.navigator.location();
                                 if current.ends_with('/') {
@@ -53,7 +50,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         });
                         // Go Forward button
                         ui.add_enabled_ui(state.navigator.can_go_forward(), |ui| {
-                            if ui.button("\u{27a1}").on_hover_text("Forward").clicked() {
+                            if ui.button(icon::FORWARD).on_hover_text("Forward").clicked() {
                                 state
                                     .update_tx
                                     .send(Update::Navgator(NavgatorType::Forward))
@@ -62,7 +59,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         });
                         // Go to Home button
                         ui.add_enabled_ui(!state.navigator.location().is_empty(), |ui| {
-                            if ui.button("\u{1f3e0}").on_hover_text("Home").clicked() {
+                            if ui.button(icon::HOME).on_hover_text("Home").clicked() {
                                 state
                                     .update_tx
                                     .send(Update::Navgator(NavgatorType::New("".into())))
@@ -76,7 +73,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                 && !state.loading_more;
 
                             ui.add_enabled_ui(enabled, |ui| {
-                                if ui.button("\u{1f503}").on_hover_text("Refresh").clicked() {
+                                if ui.button(icon::REFRESH).on_hover_text("Refresh").clicked() {
                                     state.refresh();
                                 }
                             });
@@ -93,7 +90,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     .selectable_value(
                                         &mut state.setting.show_type,
                                         ShowType::Thumb,
-                                        egui::RichText::new("\u{25a3}").color(
+                                        egui::RichText::new(icon::THUMB).color(
                                             if show_type == ShowType::Thumb {
                                                 active_color
                                             } else {
@@ -109,7 +106,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     .selectable_value(
                                         &mut state.setting.show_type,
                                         ShowType::List,
-                                        egui::RichText::new("\u{2630}").color(
+                                        egui::RichText::new(icon::LIST).color(
                                             if show_type == ShowType::List {
                                                 active_color
                                             } else {
@@ -127,13 +124,16 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                     });
                     ui.horizontal(|ui| {
                         // upload button
-                        if ui.button("\u{1f5c1} Upload").clicked() {
+                        if ui.button(format!("{} Upload", icon::UPLOAD)).clicked() {
                             if let Some(paths) = rfd::FileDialog::new().pick_files() {
                                 state.picked_path = paths;
                             }
                         }
                         // create folder button
-                        if ui.button("\u{2795} Create Folder").clicked() {
+                        if ui
+                            .button(format!("{} Create Folder", icon::CREATE_FOLDER))
+                            .clicked()
+                        {
                             state.confirm.prompt(
                                 "Please enter the folder name:",
                                 ConfirmAction::CreateFolder("".into()),
@@ -143,19 +143,19 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         ui.add_enabled_ui(
                             state.selected_item == 1 && state.file_action.is_none(),
                             |ui| {
-                                if ui.button("\u{1f5d0} Copy").clicked() {
+                                if ui.button(format!("{} Copy", icon::COPY)).clicked() {
                                     if let Some(obj) = state.list.iter().find(|x| x.selected) {
                                         state.file_action =
                                             Some(FileAction::Copy(obj.key().to_string()));
                                     }
                                 }
-                                if ui.button("\u{1f4e5} Move").clicked() {
+                                if ui.button(format!("{} Move", icon::MOVE)).clicked() {
                                     if let Some(obj) = state.list.iter().find(|x| x.selected) {
                                         state.file_action =
                                             Some(FileAction::Move(obj.key().to_string()));
                                     }
                                 }
-                                if ui.button("\u{270f} Rename").clicked() {
+                                if ui.button(format!("{} Rename", icon::RENAME)).clicked() {
                                     if let Some(obj) = state.list.iter().find(|x| x.selected) {
                                         state.confirm.prompt(
                                             "Please enter a new file name:",
@@ -171,7 +171,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         ui.add_enabled_ui(
                             state.selected_item > 0 && state.file_action.is_none(),
                             |ui| {
-                                if ui.button("\u{1f5d1} Delete").clicked() {
+                                if ui.button(format!("{} Delete", icon::DELETE)).clicked() {
                                     state.confirm.show(
                                         "Do you confirm to delete selected items?",
                                         ConfirmAction::RemoveFiles,
@@ -217,7 +217,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                         }
                                     }
                                 }
-                                if ui.button("\u{274c}").on_hover_text("Cancel").clicked() {
+                                if ui.button(icon::CLOSE).on_hover_text("Cancel").clicked() {
                                     state.file_action = None;
                                 }
                             });

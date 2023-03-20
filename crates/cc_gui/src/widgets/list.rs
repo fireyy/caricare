@@ -1,5 +1,6 @@
 use super::item_ui;
 use crate::state::{NavgatorType, State, Update};
+use crate::theme::icon;
 use crate::widgets::confirm::ConfirmAction;
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use oss_sdk::ObjectType;
@@ -32,14 +33,18 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                     egui::Frame::none().show(ui, |ui| {
                         ui.set_width(60.);
-                        if ui.button("\u{1f5d1}").on_hover_text("Delete").clicked() {
+                        if ui.button(icon::DELETE).on_hover_text("Delete").clicked() {
                             state.confirm.show(
                                 format!("Do you confirm to delete this item: {}?", data.key()),
                                 ConfirmAction::RemoveFile(data.clone()),
                             );
                         }
                         // download file
-                        if ui.button("\u{1f4e9}").on_hover_text("Download").clicked() {
+                        if ui
+                            .button(icon::DOWNLOAD)
+                            .on_hover_text("Download")
+                            .clicked()
+                        {
                             state
                                 .update_tx
                                 .send(Update::DownloadObject(data.key().to_string()))

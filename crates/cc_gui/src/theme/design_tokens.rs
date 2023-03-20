@@ -31,11 +31,46 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
             "Inter-Medium".into(),
             egui::FontData::from_static(include_bytes!("../data/Inter-Medium.otf")),
         );
+        // icon font
+        font_definitions.font_data.insert(
+            "Icon".into(),
+            egui::FontData::from_static(include_bytes!("../data/icon.ttf")).tweak(
+                egui::FontTweak {
+                    scale: 1.0,
+                    y_offset_factor: 0.0,
+                    y_offset: 0.0,
+                },
+            ),
+        );
+        // chinese font
+        if cfg!(feature = "lang-cjk") {
+            font_definitions.font_data.insert(
+                "SourceHan-Medium".into(),
+                egui::FontData::from_static(include_bytes!("../data/SourceHanSansCN-Medium.otf")),
+            );
+        }
         font_definitions
             .families
             .get_mut(&egui::FontFamily::Proportional)
             .unwrap()
             .insert(0, "Inter-Medium".into());
+        if cfg!(feature = "lang-cjk") {
+            font_definitions
+                .families
+                .get_mut(&egui::FontFamily::Proportional)
+                .unwrap()
+                .insert(1, "SourceHan-Medium".into());
+            font_definitions
+                .families
+                .get_mut(&egui::FontFamily::Monospace)
+                .unwrap()
+                .push("SourceHan-Medium".into());
+        }
+        font_definitions
+            .families
+            .get_mut(&egui::FontFamily::Proportional)
+            .unwrap()
+            .insert(2, "Icon".into());
         ctx.set_fonts(font_definitions);
     }
 
