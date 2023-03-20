@@ -3,7 +3,6 @@ mod design_tokens;
 use design_tokens::DesignTokens;
 use eframe::epaint::text::{LayoutJob, TextWrapping};
 
-pub const FULLSIZE_CONTENT: bool = cfg!(target_os = "macos");
 pub const CUSTOM_WINDOW_DECORATIONS: bool = false;
 
 pub struct TopBarStyle {
@@ -133,7 +132,7 @@ impl CCUi {
         let make_room_for_window_buttons = {
             #[cfg(target_os = "macos")]
             {
-                FULLSIZE_CONTENT && !fullscreen
+                !fullscreen
             }
             #[cfg(not(target_os = "macos"))]
             {

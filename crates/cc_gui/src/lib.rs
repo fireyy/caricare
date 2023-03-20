@@ -5,6 +5,7 @@ mod theme;
 mod widgets;
 
 pub use app::App;
+pub use theme::CUSTOM_WINDOW_DECORATIONS;
 
 pub static THUMB_LIST_WIDTH: f32 = 200.0;
 pub static THUMB_LIST_HEIGHT: f32 = 50.0;

@@ -17,9 +17,9 @@ fn main() -> Result<(), eframe::Error> {
             fullsize_content: true,
 
             // Maybe hide the OS-specific "chrome" around the window:
-            decorated: true,
+            decorated: !cc_gui::CUSTOM_WINDOW_DECORATIONS,
             // To have rounded corners we need transparency:
-            transparent: false,
+            transparent: cc_gui::CUSTOM_WINDOW_DECORATIONS,
 
             follow_system_theme: false,
             ..Default::default()
