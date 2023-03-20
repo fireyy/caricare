@@ -52,9 +52,10 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
         ..state.cc_ui.bottom_panel_frame()
     };
     egui::SidePanel::right("preview_panel")
-        .default_width(100.0)
+        // .min_width(200.0)
         .resizable(true)
         .frame(frame)
+        .max_width(400.0)
         .show_animated(ctx, state.is_preview, |ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                 if ui
@@ -65,52 +66,60 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                     state.is_preview = false;
                 }
             });
-            let resp = egui::ScrollArea::both()
-                .auto_shrink([false; 2])
-                .max_height(win_size.y - 110.0)
-                .show(ui, |ui| {
-                    if let Some(file) = state.file_cache.check(state.current_object.url()) {
-                        if file.is_image() {
-                            let mut size = file.size_vec2();
-                            size = if state.img_zoom != 1.0 {
-                                size * state.img_zoom
-                            } else {
-                                size * (ui.available_width() / size.x).min(1.0)
-                            };
+            let mut is_image = false;
+            if let Some(file) = state.file_cache.check(state.current_object.url()) {
+                if file.is_image() {
+                    is_image = true;
+                    let mut size = file.size_vec2();
+                    size = if state.img_zoom != 1.0 {
+                        size * state.img_zoom
+                    } else {
+                        size * (ui.available_width() / size.x).min(1.0)
+                    };
+                    let resp = egui::ScrollArea::both()
+                        .auto_shrink([false; 2])
+                        .max_height(win_size.y - 110.0)
+                        .show(ui, |ui| {
                             ui.centered_and_justified(|ui| {
                                 file.show_size(ui, size);
                             });
-                        } else {
-                            file.show(ui);
+                        });
+                    if ui.rect_contains_pointer(resp.inner_rect) {
+                        let (zoom, pointer_delta, _pointer_down, _modifiers) = ui.input(|i| {
+                            let zoom = i.events.iter().find_map(|e| match e {
+                                egui::Event::Zoom(v) => Some(*v),
+                                _ => None,
+                            });
+                            (
+                                zoom,
+                                i.pointer.interact_pos(),
+                                i.pointer.primary_down(),
+                                i.modifiers,
+                            )
+                        });
+                        if let Some(zoom) = zoom {
+                            // tracing::info!("zoom: {:?}, pointer: {:?}", zoom, pointer_delta,);
+                            if let Some(pointer_delta) = pointer_delta {
+                                mouse_wheel_zoom(zoom, pointer_delta.to_vec2(), state);
+                            }
                         }
-                    } else {
-                        ui.centered_and_justified(|ui| ui.spinner());
                     }
-                });
-
-            if ui.rect_contains_pointer(resp.inner_rect) {
-                let (zoom, pointer_delta, _pointer_down, _modifiers) = ui.input(|i| {
-                    let zoom = i.events.iter().find_map(|e| match e {
-                        egui::Event::Zoom(v) => Some(*v),
-                        _ => None,
-                    });
-                    (
-                        zoom,
-                        i.pointer.interact_pos(),
-                        i.pointer.primary_down(),
-                        i.modifiers,
-                    )
-                });
-                if let Some(zoom) = zoom {
-                    // tracing::info!("zoom: {:?}, pointer: {:?}", zoom, pointer_delta,);
-                    if let Some(pointer_delta) = pointer_delta {
-                        mouse_wheel_zoom(zoom, pointer_delta.to_vec2(), state);
-                    }
+                } else {
+                    is_image = false;
+                    egui::ScrollArea::both()
+                        .auto_shrink([false; 2])
+                        .max_height(win_size.y - 88.0)
+                        .show(ui, |ui| {
+                            file.show(ui);
+                        });
                 }
+            } else {
+                ui.centered_and_justified(|ui| ui.spinner());
             }
-            ui.vertical_centered_justified(|ui| {
+
+            if is_image {
                 ui.horizontal(|ui| {
-                    ui.label("Zoom: ");
+                    ui.label(format!("{} Zoom: ", icon::CROSS_HAIR));
                     if ui.button(icon::ZOOM_IN).on_hover_text("Zoom In").clicked() {
                         zoom_action(win_size, state, ZoomType::In);
                     }
@@ -129,35 +138,44 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                         zoom_action(win_size, state, ZoomType::Out);
                     }
                 });
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let mut url = state.current_object.url();
-                    if ui.button(format!("{} Copy", icon::CLIPBOARD)).clicked() {
-                        ui.output_mut(|o| o.copied_text = url.to_string());
-                        state.toasts.success("Copied!");
-                    }
-                    if state.bucket_is_private()
-                        && ui.button(format!("{} Generate", icon::LINK)).clicked()
-                    {
-                        state.confirm.prompt(
-                            "Please enter the link expiration (in seconds):",
-                            ConfirmAction::GenerateUrl(3600),
-                        );
-                    }
-                    ui.add(egui::TextEdit::singleline(&mut url));
-                    ui.label(format!("{} Link:", icon::LINK));
-                });
-                ui.horizontal(|ui| {
-                    ui.label(format!(
-                        "{} Size: {}",
-                        icon::SIZE,
-                        state.current_object.size_string()
-                    ));
-                    ui.label(format!(
-                        "{} Last Modified: {}",
-                        icon::DATE,
-                        state.current_object.date_string()
-                    ));
-                });
+            }
+            ui.horizontal(|ui| {
+                let mut url = state.current_object.url();
+                ui.label(format!("{} Link:", icon::LINK));
+                ui.add(
+                    egui::TextEdit::singleline(&mut url).desired_width(ui.available_width() - 50.0),
+                );
+                if state.bucket_is_private()
+                    && ui
+                        .button(icon::REFRESH)
+                        .on_hover_text("Generate Link")
+                        .clicked()
+                {
+                    state.confirm.prompt(
+                        "Please enter the link expiration (in seconds):",
+                        ConfirmAction::GenerateUrl(3600),
+                    );
+                }
+                if ui
+                    .button(icon::CLIPBOARD)
+                    .on_hover_text("Copy Link")
+                    .clicked()
+                {
+                    ui.output_mut(|o| o.copied_text = url.to_string());
+                    state.toasts.success("Copied!");
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label(format!(
+                    "{} Size: {}",
+                    icon::SIZE,
+                    state.current_object.size_string()
+                ));
+                ui.label(format!(
+                    "{} Last Modified: {}",
+                    icon::DATE,
+                    state.current_object.date_string()
+                ));
             });
         });
 }

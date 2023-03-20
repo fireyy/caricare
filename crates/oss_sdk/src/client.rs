@@ -114,6 +114,7 @@ impl Client {
 
     pub async fn get_object(&self, object: impl AsRef<str>) -> Result<(String, Vec<u8>)> {
         let object = object.as_ref();
+        // TODO: check resp xml
         let (resp, _headers) = self
             .do_request(reqwest::Method::GET, object, None, None, vec![])
             .await?;

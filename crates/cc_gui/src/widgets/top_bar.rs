@@ -224,7 +224,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         });
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             let response = ui.add_sized(
-                                ui.available_size() - [100.0, 0.0].into(),
+                                ui.available_size() - [20.0, 0.0].into(),
                                 egui::TextEdit::singleline(&mut state.filter_str)
                                     .hint_text("Filter with file name")
                                     .lock_focus(false),
@@ -234,6 +234,8 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                 response.request_focus();
                                 state.filter();
                             }
+
+                            ui.label(icon::FILTER);
                         });
                     });
                 });

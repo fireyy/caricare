@@ -25,3 +25,4 @@ pub const DOWNLOAD: &str = "\u{e864}";
 pub const CLIPBOARD: &str = "\u{e84b}";
 pub const FILTER: &str = "\u{e875}";
 pub const LINK: &str = "\u{e884}";
+pub const CROSS_HAIR: &str = "\u{e860}";
