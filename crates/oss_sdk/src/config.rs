@@ -6,16 +6,11 @@ use once_cell::sync::Lazy;
 use crate::types::Credentials;
 use crate::{util, VERSION};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub(crate) enum AuthVersion {
+    #[default]
     V1,
     V2,
-}
-
-impl Default for AuthVersion {
-    fn default() -> Self {
-        AuthVersion::V1
-    }
 }
 
 #[derive(Debug)]

@@ -27,7 +27,7 @@ pub(crate) fn check_bucket_name(name: &str) -> Result<()> {
         anyhow::bail!("bucket name {} len is between [3-63],now is {}", name, &len);
     }
     for ch in name.chars() {
-        let valid = ('a'..='z').contains(&ch) || ('0'..='9').contains(&ch) || ch == '-';
+        let valid = ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-';
         if !valid {
             anyhow::bail!(
                 "bucket name {} can only include lowercase letters, numbers, and -",
