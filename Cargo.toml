@@ -2,21 +2,22 @@
 name = "caricare"
 version = "0.1.0"
 edition = "2021"
-description = "An Alibaba Cloud Object Storage Service (OSS) browser GUI for Rust."
+description = "A simple cross-platform desktop application for Aliyun OSS(Object Storage Service). Built in Rust using egui."
 
 [package.metadata.bundle]
 name = "Caricare"
 identifier = "com.fireyy.caricare"
 icon = ["icons/Icon.icns", "icons/Icon.iconset/icon-256.png", "icons/Icon.iconset/icon-32.png", "icons/Icon.iconset/icon-16.png"]
 version = "1.0.0"
-copyright = "Copyright (c) Fireyy (2021). All rights reserved."
+copyright = "Copyright (c) Fireyy (2023). All rights reserved."
 category = "Developer Tool"
-short_description = "An Alibaba Cloud Object Storage Service (OSS) browser GUI for Rust"
+short_description = "A simple cross-platform desktop application for Aliyun OSS(Object Storage Service)."
 osx_minimum_system_version = "10.12"
 
 [dependencies]
 cc_core = { workspace = true }
-cc_gui = { workspace = true, features = ["lang-cjk"] }
+# cc_gui = { workspace = true, features = ["lang-cjk"] }
+cc_gui = { workspace = true }
 eframe = { workspace = true }
 cc_runtime = { workspace = true }
 
@@ -56,4 +57,8 @@ opt-level = 1 # Make debug builds run faster
 opt-level = 2
 
 [profile.release]
-# debug = true # good for profilers
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

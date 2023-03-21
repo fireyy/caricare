@@ -4,7 +4,7 @@ set -e
 
 # Compile for older macOS Versions
 # See: https://users.rust-lang.org/t/compile-rust-binary-for-older-versions-of-mac-osx/38695/2
-export MACOSX_DEPLOYMENT_TARGET=10.10
+export MACOSX_DEPLOYMENT_TARGET=10.12
 
 rm -rf ./target/release/bundle/osx/Caricare.app
 
