@@ -1,27 +1,10 @@
 use crate::util::get_name_form_path;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
-use time::format_description::well_known::Rfc3339;
 use time::{format_description, OffsetDateTime};
 
 pub type Params = BTreeMap<String, Option<String>>;
 pub type Headers = HashMap<String, String>;
-
-pub(crate) trait Credentials: Send + Sync {
-    fn access_key_id(&self) -> &str;
-    fn access_key_secret(&self) -> &str;
-    fn security_token(&self) -> &str;
-}
-
-impl Debug for dyn Credentials {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Credentials")
-            .field("access_key_id", &self.access_key_id().to_string())
-            .field("access_key_secret", &self.access_key_secret().to_string())
-            .field("security_token", &self.security_token().to_string())
-            .finish()
-    }
-}
 
 #[derive(Clone, Debug, Default)]
 pub struct ListObjects {
@@ -96,6 +79,13 @@ impl ListObjects {
     pub fn set_common_prefixes(&mut self, common_prefixes: Vec<Object>) {
         self.common_prefixes = common_prefixes;
     }
+
+    pub fn contents(&self) -> Vec<Object> {
+        let mut contents = self.common_prefixes.clone();
+        let mut objects = self.objects.clone();
+        contents.append(&mut objects);
+        contents
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -108,7 +98,7 @@ pub enum ObjectType {
 #[derive(Clone, Debug, Default)]
 pub struct Object {
     key: String,
-    last_modified: String,
+    last_modified: Option<OffsetDateTime>,
     size: usize,
     etag: String,
     mine_type: String,
@@ -121,34 +111,18 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn new(
-        key: String,
-        last_modified: String,
-        size: usize,
-
-        etag: String,
-        storage_class: String,
-        owner_id: String,
-        owner_display_name: String,
-    ) -> Self {
+    pub fn new(key: &str, last_modified: Option<OffsetDateTime>, size: usize) -> Self {
         Object {
-            key,
+            key: key.to_owned(),
             last_modified,
             size,
-            etag,
-            mine_type: Default::default(),
-            storage_class,
-            owner_id,
-            owner_display_name,
-            obj_type: ObjectType::File,
-            selected: false,
-            url: Default::default(),
+            ..Default::default()
         }
     }
 
-    pub fn new_folder(key: String) -> Self {
+    pub fn new_folder(key: &str) -> Self {
         Object {
-            key,
+            key: key.to_owned(),
             obj_type: ObjectType::Folder,
             ..Default::default()
         }
@@ -158,8 +132,8 @@ impl Object {
         &self.key
     }
 
-    pub fn last_modified(&self) -> &str {
-        &self.last_modified
+    pub fn last_modified(&self) -> OffsetDateTime {
+        self.last_modified.unwrap_or(OffsetDateTime::UNIX_EPOCH)
     }
 
     pub fn size(&self) -> usize {
@@ -207,18 +181,14 @@ impl Object {
     }
 
     pub fn date_string(&self) -> String {
-        if self.last_modified.is_empty() {
-            "-".into()
-        } else {
-            match OffsetDateTime::parse(&self.last_modified, &Rfc3339) {
-                Ok(date) => {
-                    let format =
-                        format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
-                            .unwrap();
-                    date.format(&format).unwrap()
-                }
-                Err(_) => "_".into(),
+        match self.last_modified {
+            Some(date) => {
+                let format =
+                    format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
+                        .unwrap();
+                date.format(&format).unwrap()
             }
+            None => "_".into(),
         }
     }
     pub fn is_file(&self) -> bool {

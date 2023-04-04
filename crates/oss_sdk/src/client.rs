@@ -1,18 +1,19 @@
-use quick_xml::{events::Event, Reader};
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::config::ClientConfig;
-use crate::conn::{Conn, UrlMaker};
-use crate::types::{Bucket, BucketACL, Headers, ListObjects, Object, Params};
+use crate::types::{Bucket, ListObjects, Object, Params};
 use crate::util::{self, get_name};
 use crate::Result;
-use reqwest::header::HeaderMap;
+
+use futures::TryStreamExt;
+use opendal::services::Oss;
+use opendal::{Metadata, Metakey, Operator};
 
 #[derive(Clone)]
 pub struct Client {
     pub(crate) config: Arc<ClientConfig>,
-    pub(crate) conn: Conn,
+    operator: Operator,
 }
 
 impl Client {
@@ -25,25 +26,14 @@ impl Client {
     fn new(config: ClientConfig) -> Result<Client> {
         let config = Arc::new(config);
 
-        let client;
-        let builder = reqwest::Client::builder()
-            .http1_only()
-            .timeout(config.timeout);
+        let mut builder = Oss::default();
+        builder.bucket(&config.bucket);
+        builder.endpoint(&config.endpoint);
+        builder.access_key_id(&config.access_key_id);
+        builder.access_key_secret(&config.access_key_secret);
+        let operator: Operator = Operator::new(builder)?.finish();
 
-        // http proxy
-        if let Some(http_proxy) = &config.http_proxy {
-            let user = http_proxy.user.to_owned().unwrap_or_default();
-            let pass = http_proxy.password.to_owned().unwrap_or_default();
-            let proxy = reqwest::Proxy::all(http_proxy.host.to_owned())?.basic_auth(&user, &pass);
-            client = builder.proxy(proxy).build()?;
-        } else {
-            client = builder.build()?;
-        }
-
-        let um = UrlMaker::new(&config.endpoint, config.cname)?;
-        let conn = Conn::new(config.clone(), Arc::new(um), client)?;
-
-        Ok(Client { conn, config })
+        Ok(Client { config, operator })
     }
 
     pub fn get_bucket_url(&self) -> String {
@@ -58,236 +48,81 @@ impl Client {
     }
 
     pub async fn get_bucket_info(&self) -> Result<Bucket> {
-        let mut query = Params::new();
-        query.insert("bucketInfo".into(), None);
+        //TODO: check for bucket acl
+        let grant = Bucket::get_acl_from_str("private");
 
-        let (data, _headers) = self
-            .do_request(reqwest::Method::GET, "", Some(query), None, vec![])
-            .await?;
-
-        let xml_str = std::str::from_utf8(&data)?;
-        tracing::debug!("XML: {}", xml_str);
-
-        let mut reader = Reader::from_str(xml_str);
-        reader.trim_text(true);
-
-        let bucket_info;
-        let mut bucket_name = String::new();
-        let mut grant = BucketACL::default();
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) => match e.name().as_ref() {
-                    b"Name" => bucket_name = reader.read_text(e.to_end().name())?.to_string(),
-                    b"Grant" => {
-                        let text = reader.read_text(e.to_end().name())?;
-                        grant = Bucket::get_acl_from_str(&text);
-                    }
-
-                    _ => (),
-                },
-
-                Ok(Event::End(ref _e)) => {}
-
-                Ok(Event::Eof) => {
-                    bucket_info = Bucket::new(bucket_name, grant);
-                    break;
-                } // exits the loop when reaching end of file
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-                _ => (), // There are several other `Event`s we do not consider here
-            }
-        }
-
-        Ok(bucket_info)
+        Ok(Bucket::new(self.config.bucket.to_owned(), grant))
     }
 
-    pub async fn head_object(&self, object: impl AsRef<str>) -> Result<HeaderMap> {
+    pub async fn head_object(&self, object: impl AsRef<str>) -> Result<Metadata> {
         let object = object.as_ref();
-        let (_, headers) = self
-            .do_request(reqwest::Method::HEAD, object, None, None, vec![])
-            .await?;
+        let meta = self.operator.stat(object).await?;
 
-        tracing::debug!("Response header: {:?}", headers);
+        tracing::debug!("Response header: {:?}", meta);
 
-        Ok(headers)
+        Ok(meta)
     }
 
     pub async fn get_object(&self, object: impl AsRef<str>) -> Result<(String, Vec<u8>)> {
         let object = object.as_ref();
-        // TODO: check resp xml
-        let (resp, _headers) = self
-            .do_request(reqwest::Method::GET, object, None, None, vec![])
-            .await?;
+        let result = self.operator.read(object).await?;
 
-        Ok((object.to_string(), resp))
+        Ok((object.to_string(), result))
     }
 
     pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<()> {
         let object = object.as_ref();
-        let _ = self
-            .do_request(reqwest::Method::DELETE, object, None, None, vec![])
-            .await?;
+        let _ = self.operator.delete(object).await?;
+        // TODO: check `object` if delete success
 
         Ok(())
     }
 
     pub async fn delete_multi_object(self, obj: Vec<Object>) -> Result<()> {
-        let mut query = Params::new();
-        query.insert("delete".into(), None);
+        let mut paths: Vec<String> = vec![];
 
-        let mut xml = vec![
-            r#"<?xml version="1.0" encoding="UTF-8"?>"#.to_string(),
-            "\n<Delete><Quiet>false</Quiet>".to_string(),
-        ];
         for o in obj.iter() {
-            xml.push(format!("<Object><Key>{}</Key></Object>", o.key()));
+            paths.push(o.key().into());
         }
-        xml.push("</Delete>".to_string());
-        let result = xml.join("");
-        let result_clone = result.clone();
 
-        let mut headers = Headers::new();
-        let len = result.len().to_string();
-        headers.insert("content-length".into(), len);
-
-        let md5_digest = md5::compute(result.as_bytes());
-        let md5_str = base64::encode(md5_digest.0);
-        tracing::debug!("md5_str: {}", base64::encode(md5_digest.0));
-        headers.insert("content-md5".into(), md5_str);
-        headers.insert("content-type".into(), "application/xml".into());
-
-        tracing::debug!("Delete: query: {:?}, headers: {:?}", query, headers);
-
-        let _ = self
-            .do_request(
-                reqwest::Method::POST,
-                "",
-                Some(query),
-                Some(headers),
-                result_clone.into_bytes(),
-            )
-            .await?;
+        self.operator.remove(paths).await?;
+        // TODO: check delete result
 
         Ok(())
     }
 
-    pub async fn list_v2(&self, query: Option<Params>) -> Result<ListObjects> {
+    pub async fn list_v2(&self, query: Option<String>) -> Result<ListObjects> {
         tracing::debug!("List object: {:?}", query);
-        let (resp, _headers) = self
-            .do_request(reqwest::Method::GET, "", query, None, vec![])
-            .await?;
+        let path = query.map_or("".into(), |x| format!("{}/", x));
+        let mut stream = self.operator.list(&path).await?;
 
-        let xml_str = std::str::from_utf8(&resp)?;
-        // tracing::debug!("XML: {}", xml_str);
-        let mut result = Vec::new();
-        let mut reader = Reader::from_str(xml_str);
-        reader.trim_text(true);
+        let mut list_objects = ListObjects::default();
+        let mut common_prefixes = Vec::new();
+        let mut objects = Vec::new();
 
-        let mut bucket_name = String::new();
-        let mut prefix = String::new();
-        let mut start_after = String::new();
-        let mut max_keys = String::new();
-        let mut delimiter = String::new();
-        let mut is_truncated = false;
+        while let Some(entry) = stream.try_next().await? {
+            let meta = self
+                .operator
+                .metadata(
+                    &entry,
+                    Metakey::Mode | Metakey::ContentLength | Metakey::LastModified,
+                )
+                .await?;
 
-        let mut key = String::new();
-        let mut last_modified = String::new();
-        let mut etag = String::new();
-        let mut size = 0usize;
-        let mut storage_class = String::new();
-        let mut owner_id = String::new();
-        let mut owner_display_name = String::new();
-        let mut next_continuation_token = None;
-
-        let mut is_common_pre = false;
-        let mut prefix_vec = Vec::new();
-
-        let mut list_objects;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(ref e)) => match e.name().as_ref() {
-                    b"CommonPrefixes" => {
-                        is_common_pre = true;
-                    }
-                    b"Name" => bucket_name = reader.read_text(e.name())?.to_string(),
-                    b"Prefix" => {
-                        if is_common_pre {
-                            let object = Object::new_folder(
-                                reader.read_text(e.to_end().name())?.to_string(),
-                            );
-                            prefix_vec.push(object);
-                        } else {
-                            prefix = reader.read_text(e.name())?.to_string();
-                        }
-                    }
-                    b"StartAfter" => start_after = reader.read_text(e.name())?.to_string(),
-                    b"MaxKeys" => max_keys = reader.read_text(e.name())?.to_string(),
-                    b"Delimiter" => delimiter = reader.read_text(e.name())?.to_string(),
-                    b"IsTruncated" => is_truncated = reader.read_text(e.name())? == "true",
-                    b"NextContinuationToken" => {
-                        let nc_token = reader.read_text(e.name())?.to_string();
-                        next_continuation_token = if !nc_token.is_empty() {
-                            Some(nc_token)
-                        } else {
-                            None
-                        };
-                    }
-                    b"Contents" => {
-                        // do nothing
-                    }
-                    b"Key" => key = reader.read_text(e.name())?.to_string(),
-                    b"LastModified" => last_modified = reader.read_text(e.name())?.to_string(),
-                    b"ETag" => etag = reader.read_text(e.name())?.to_string(),
-                    b"Size" => size = reader.read_text(e.name())?.parse::<usize>().unwrap(),
-                    b"StorageClass" => storage_class = reader.read_text(e.name())?.to_string(),
-                    b"Owner" => {
-                        // do nothing
-                    }
-                    b"ID" => owner_id = reader.read_text(e.name())?.to_string(),
-                    b"DisplayName" => owner_display_name = reader.read_text(e.name())?.to_string(),
-
-                    _ => (),
-                },
-
-                Ok(Event::End(ref e)) => match e.name().as_ref() {
-                    b"CommonPrefixes" => {
-                        is_common_pre = false;
-                    }
-                    b"Contents" => {
-                        let object = Object::new(
-                            key.clone(),
-                            last_modified.clone(),
-                            size,
-                            etag.clone(),
-                            storage_class.clone(),
-                            owner_id.clone(),
-                            owner_display_name.clone(),
-                        );
-                        result.push(object);
-                    }
-                    _ => (),
-                },
-
-                Ok(Event::Eof) => {
-                    list_objects = ListObjects::new(
-                        bucket_name,
-                        delimiter,
-                        prefix,
-                        start_after,
-                        max_keys,
-                        is_truncated,
-                    );
-
-                    list_objects.set_next_continuation_token(next_continuation_token);
-                    list_objects.set_objects(result);
-                    list_objects.set_common_prefixes(prefix_vec);
-                    break;
-                } // exits the loop when reaching end of file
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-                _ => (), // There are several other `Event`s we do not consider here
+            if meta.is_dir() {
+                common_prefixes.push(Object::new_folder(entry.path()));
+            } else {
+                objects.push(Object::new(
+                    entry.path(),
+                    meta.last_modified(),
+                    meta.content_length() as usize,
+                ));
             }
         }
+
+        list_objects.set_common_prefixes(common_prefixes);
+        list_objects.set_objects(objects);
+
         Ok(list_objects)
     }
 
@@ -299,12 +134,8 @@ impl Client {
         };
         tracing::debug!("Create folder: {}", path);
 
-        let mut headers = Headers::new();
-        headers.insert("content-length".into(), 0.to_string());
-
-        let _ = self
-            .do_request(reqwest::Method::PUT, &path, None, Some(headers), vec![])
-            .await?;
+        let _ = self.operator.create_dir(&path).await?;
+        // TODO: use `stat` to check create dir result
 
         Ok(())
     }
@@ -317,41 +148,26 @@ impl Client {
     ) -> Result<(String, bool)> {
         let src = src.as_ref();
         let dest = dest.as_ref();
+
         tracing::debug!("Copy object: {}", src);
 
-        let mut headers = Headers::new();
-        headers.insert(
-            "x-oss-copy-source".into(),
-            format!("/{}/{}", self.config.bucket, src),
-        );
-
-        let _ = self
-            .do_request(reqwest::Method::PUT, dest, None, Some(headers), vec![])
-            .await?;
+        let mut dst_w = self.operator.writer(&dest).await?;
+        let reader = self.operator.reader(&src).await?;
+        let buf_reader = futures::io::BufReader::with_capacity(8 * 1024 * 1024, reader);
+        futures::io::copy_buf(buf_reader, &mut dst_w).await?;
+        // flush data
+        dst_w.close().await?;
 
         Ok((src.to_string(), is_move))
     }
 
     pub async fn put(&self, path: PathBuf, dest: &str) -> Result<()> {
         let name = get_name(&path);
-        let file_content = std::fs::read(path).unwrap();
         let key = format!("{dest}{name}");
-        let content_length = file_content.len().to_string();
-        let mut headers = Headers::new();
-        headers.insert("content-length".into(), content_length);
-        if let Some(con) = infer::get(&file_content) {
-            headers.insert("content-type".into(), con.mime_type().to_string());
-        }
+        let file_content = std::fs::read(path)?;
 
-        let _ = self
-            .do_request(
-                reqwest::Method::PUT,
-                &key,
-                None,
-                Some(headers),
-                file_content,
-            )
-            .await?;
+        let _ = self.operator.write(&key, file_content).await?;
+        // TODO: check if put success
 
         Ok(())
     }
@@ -372,24 +188,14 @@ impl Client {
         &self,
         object: &str,
         expire: i64,
-        params: Option<Params>,
+        // TODO: join the params like: x-oss-image=
+        _params: Option<Params>,
     ) -> Result<String> {
-        self.conn.signature_url(object, expire, params)
-    }
+        let url = self
+            .operator
+            .presign_read(object, time::Duration::seconds(expire))?;
 
-    async fn do_request(
-        &self,
-        method: reqwest::Method,
-        object: &str,
-        query: Option<Params>,
-        headers: Option<Headers>,
-        data: Vec<u8>,
-    ) -> Result<(Vec<u8>, reqwest::header::HeaderMap)> {
-        util::check_bucket_name(&self.config.bucket)?;
-
-        self.conn
-            .execute(method, object, query, headers, data, 0)
-            .await
+        Ok(url.uri().to_string())
     }
 }
 

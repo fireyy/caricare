@@ -2,14 +2,14 @@ use crate::spawn_evs;
 use crate::theme;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
-    file_view_ui, log_panel_ui,
+    file_view_ui, log_panel_ui, transfer_panel_ui,
 };
 use cc_core::{log::LogItem, store, tracing, MemoryHistory, Session, Setting};
 use cc_files::Cache as ImageCache;
 use egui_notify::Toasts;
 use oss_sdk::util::get_name_form_path;
 use oss_sdk::{
-    Bucket, Client as OssClient, HeaderMap, ListObjects, Object, Params, Result as OssResult,
+    Bucket, Client as OssClient, ListObjects, Metadata, Object, Params, Result as OssResult,
 };
 use std::{path::PathBuf, sync::mpsc, vec};
 
@@ -51,7 +51,7 @@ pub enum Update {
     Deleted(OssResult<()>),
     CreateFolder(OssResult<()>),
     ViewObject(Object),
-    HeadObject(OssResult<HeaderMap>),
+    HeadObject(OssResult<Metadata>),
     GetObject(OssResult<(String, Vec<u8>)>),
     BucketInfo(OssResult<Bucket>),
     Copied(OssResult<(String, bool)>),
@@ -94,6 +94,8 @@ pub struct State {
     pub ctx: egui::Context,
     pub bucket: Option<Bucket>,
     pub file_action: Option<FileAction>,
+    pub is_show_transfer: bool,
+    pub transfer_filter_str: String,
 }
 
 impl State {
@@ -173,6 +175,8 @@ impl State {
             ctx: ctx.clone(),
             bucket,
             file_action: None,
+            is_show_transfer: false,
+            transfer_filter_str: String::new(),
         };
 
         this.next_query = Some(this.build_query(None));
@@ -278,9 +282,8 @@ impl State {
                             self.current_object.set_url(url);
                         }
                         tracing::debug!("current_img: {:?}", self.current_object);
-                        if let Some(mint_type) = headers.get("content-type") {
-                            self.current_object
-                                .set_mine_type(mint_type.to_str().unwrap().to_string());
+                        if let Some(mint_type) = headers.content_type() {
+                            self.current_object.set_mine_type(mint_type.to_string());
                         }
                         self.get_current_object();
                     }
@@ -346,6 +349,7 @@ impl State {
         if self.oss.is_some() {
             file_view_ui(ctx, self);
             log_panel_ui(ctx, self);
+            transfer_panel_ui(ctx, self);
         }
 
         self.toasts.show(ctx);
@@ -393,7 +397,7 @@ impl State {
         }
         let picked_path = self.picked_path.clone();
         self.picked_path = vec![];
-        self.status = Status::Busy(Route::Upload);
+        // self.status = Status::Busy(Route::Upload);
 
         let dest = self.current_path.clone();
 
@@ -483,12 +487,12 @@ impl State {
     }
 
     pub fn get_list(&mut self) {
-        if let Some(query) = &self.next_query {
+        if let Some(_query) = &self.next_query {
             if !self.loading_more {
                 self.status = Status::Busy(Route::List);
             }
 
-            let query = query.clone();
+            let query = self.current_path.clone();
 
             spawn_evs!(self, |evs, client, ctx| {
                 let res = client.list_v2(Some(query)).await;

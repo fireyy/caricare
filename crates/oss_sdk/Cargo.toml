@@ -8,15 +8,12 @@ edition = "2021"
 [dependencies]
 thiserror = "1.0"
 anyhow = "1.0"
-reqwest = { workspace = true }
-quick-xml = "0.27"
 tracing = { workspace = true }
 bytesize = "1.1.0"
-reqsign = { version = "0.8.3", features = ["reqwest_request"] }
 once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-md5 = "0.7.0"
-base64 = "0.20"
 infer = { workspace = true }
 time = { version = "0.3", features = ["macros", "formatting", "parsing"] }
+opendal = "0.30.4"
+futures = "0.3"
