@@ -1,12 +1,19 @@
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::config::ClientConfig;
+use crate::partial_file::PartialFile;
 use crate::types::{Bucket, ListObjects, Object, Params};
 use crate::util::{self, get_name};
 use crate::Result;
+use anyhow::Context;
 
-use futures::TryStreamExt;
+use crate::stream::{
+    AsyncReadProgressExt, BoxedStreamingUploader, StreamingUploader, TrackableBodyStream,
+};
+use futures::{AsyncReadExt, TryStreamExt};
 use opendal::services::Oss;
 use opendal::{Metadata, Metakey, Operator};
 
@@ -149,24 +156,93 @@ impl Client {
         let src = src.as_ref();
         let dest = dest.as_ref();
 
-        tracing::debug!("Copy object: {}", src);
+        tracing::debug!("Copy object: {} to: {}", src, dest);
 
-        let mut dst_w = self.operator.writer(&dest).await?;
-        let reader = self.operator.reader(&src).await?;
-        let buf_reader = futures::io::BufReader::with_capacity(8 * 1024 * 1024, reader);
-        futures::io::copy_buf(buf_reader, &mut dst_w).await?;
-        // flush data
-        dst_w.close().await?;
+        // let _ = self.operator.copy().await?;
 
         Ok((src.to_string(), is_move))
+    }
+
+    fn streaming_upload(&self, path: &str) -> Result<BoxedStreamingUploader> {
+        Ok(Box::new(StreamingUploader::new(
+            self.operator.clone(),
+            path.to_string(),
+        )))
+    }
+
+    async fn streaming_read(&self, path: &str, start_pos: Option<usize>) -> Result<Vec<u8>> {
+        let reader = match start_pos {
+            Some(start_position) => {
+                self.operator
+                    .range_reader(path, start_position as u64..)
+                    .await?
+            }
+            None => self.operator.reader(path).await?,
+        };
+
+        let size = self.head_object(path).await?.content_length();
+        let mut body = Vec::new();
+
+        let mut stream =
+            reader
+                .into_async_read()
+                .report_progress(Duration::from_secs(2), |bytes_read| {
+                    use humansize::{file_size_opts as options, FileSize};
+
+                    tracing::debug!(
+                        "reading `{}`… {}/{}",
+                        path,
+                        bytes_read
+                            .file_size(options::BINARY)
+                            .expect("never negative"),
+                        size.file_size(options::BINARY).expect("never negative")
+                    )
+                });
+
+        stream
+            .read_to_end(&mut body)
+            .await
+            .context("failed to read object content into buffer")?;
+
+        Ok(body)
+    }
+
+    pub async fn download_file(&self, obj: &str, target: PathBuf) -> Result<()> {
+        let mut new_file = PartialFile::create(&target)
+            .with_context(|| format!("create `{}`", target.display()))?;
+
+        let content = self.streaming_read(obj, None).await?;
+
+        new_file
+            .write_all(&content)
+            .context("write content of file")?;
+        new_file.finish().context("finish writing to new file")?;
+
+        Ok(())
     }
 
     pub async fn put(&self, path: PathBuf, dest: &str) -> Result<()> {
         let name = get_name(&path);
         let key = format!("{dest}{name}");
-        let file_content = std::fs::read(path)?;
 
-        let _ = self.operator.write(&key, file_content).await?;
+        let mut body = TrackableBodyStream::try_from(path)
+            .map_err(|e| {
+                panic!("Could not open sample file: {}", e);
+            })
+            .unwrap();
+
+        body.set_callback(move |tot_size: u64, sent: u64, cur_buf: u64| {
+            tracing::debug!("Upload progress: {cur_buf}/{tot_size}");
+            if sent == tot_size {
+                tracing::debug!("Upload Done!");
+            }
+        });
+
+        let mut uploader = self.streaming_upload(&key)?;
+        while let Ok(Some(bytes)) = body.try_next().await {
+            uploader.write_bytes(bytes).await?;
+        }
+        uploader.finish().await?;
         // TODO: check if put success
 
         Ok(())

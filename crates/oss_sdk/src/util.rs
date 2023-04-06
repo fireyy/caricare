@@ -47,11 +47,6 @@ pub(crate) fn check_bucket_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn query_escape(input: &str) -> String {
-    let s = format!("k={input}");
-    s[2..].replace('+', "%20")
-}
-
 pub(crate) struct SysInfo(String, String, String);
 
 impl SysInfo {
@@ -110,10 +105,5 @@ mod test_super {
             SYS_INFO.release(),
             SYS_INFO.machine()
         );
-    }
-
-    #[test]
-    fn test_query_escape() {
-        println!("{}", query_escape("abc"));
     }
 }

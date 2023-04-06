@@ -636,17 +636,19 @@ impl State {
         let file_name = get_name_form_path(&name);
         if let Some(path) = rfd::FileDialog::new().set_file_name(&file_name).save_file() {
             spawn_evs!(self, |evs, client, ctx| {
-                let res = client.get_object(name).await;
-                if let Ok((_name, data)) = res {
-                    match std::fs::write(path, data) {
-                        Ok(_) => evs
-                            .send(Update::Success("Download success.".into()))
-                            .unwrap(),
-                        Err(_) => evs.send(Update::Error("Download failed.".into())).unwrap(),
-                    }
-                } else {
-                    evs.send(Update::Error("Download failed.".into())).unwrap();
-                }
+                let _res = client.download_file(&name, path).await;
+                // if let Ok((_name, data)) = res {
+                //     match std::fs::write(path, data) {
+                //         Ok(_) => evs
+                //             .send(Update::Success("Download success.".into()))
+                //             .unwrap(),
+                //         Err(_) => evs.send(Update::Error("Download failed.".into())).unwrap(),
+                //     }
+                // } else {
+                //     evs.send(Update::Error("Download failed.".into())).unwrap();
+                // }
+                evs.send(Update::Success("Download success.".into()))
+                    .unwrap();
                 ctx.request_repaint();
             });
         }
