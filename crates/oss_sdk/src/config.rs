@@ -1,17 +1,6 @@
 #![allow(dead_code)]
 use std::{fmt::Debug, time::Duration};
 
-use once_cell::sync::Lazy;
-
-use crate::{util, VERSION};
-
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub(crate) enum AuthVersion {
-    #[default]
-    V1,
-    V2,
-}
-
 #[derive(Debug)]
 pub(crate) struct HttpTimeout {
     pub(crate) connect: Duration,
@@ -41,7 +30,6 @@ pub(crate) struct ClientConfig {
     pub(crate) access_key_secret: String,
     pub(crate) bucket: String,
     pub(crate) retries: u32,
-    pub(crate) ua: String,
     pub(crate) debug: bool,
     pub(crate) timeout: Duration,
     pub(crate) security_token: String,
@@ -56,30 +44,16 @@ pub(crate) struct ClientConfig {
     pub(crate) upload_limit_speed: i64,
     //...
     pub(crate) additional_headers: Vec<String>,
-    pub(crate) auth_version: AuthVersion,
 }
-
-static DEFAULT_USER_AGENT: Lazy<String> = Lazy::new(|| {
-    let os = util::SYS_INFO.name();
-    let arch = util::SYS_INFO.machine();
-    let release = util::SYS_INFO.release();
-
-    format!("caricare/{VERSION} ({os}/{release}/{arch};)")
-});
 
 impl Default for ClientConfig {
     fn default() -> Self {
-        let ua = DEFAULT_USER_AGENT.clone();
-
-        tracing::debug!("get default user-agent: {}", ua);
-
         Self {
             endpoint: Default::default(),
             access_key_id: Default::default(),
             access_key_secret: Default::default(),
             bucket: Default::default(),
             retries: Default::default(),
-            ua,
             debug: Default::default(),
             timeout: Duration::from_secs(60),
             security_token: Default::default(),
@@ -93,7 +67,6 @@ impl Default for ClientConfig {
             log_level: Default::default(),
             upload_limit_speed: Default::default(),
             additional_headers: Default::default(),
-            auth_version: Default::default(),
         }
     }
 }

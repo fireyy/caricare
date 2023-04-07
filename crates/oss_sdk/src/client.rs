@@ -5,8 +5,9 @@ use std::time::Duration;
 
 use crate::config::ClientConfig;
 use crate::partial_file::PartialFile;
+use crate::transfer::{TransferItem, TransferSender, TransferType};
 use crate::types::{Bucket, ListObjects, Object, Params};
-use crate::util::{self, get_name};
+use crate::util::get_name;
 use crate::Result;
 use anyhow::Context;
 
@@ -170,7 +171,12 @@ impl Client {
         )))
     }
 
-    async fn streaming_read(&self, path: &str, start_pos: Option<usize>) -> Result<Vec<u8>> {
+    async fn streaming_read(
+        &self,
+        path: &str,
+        start_pos: Option<usize>,
+        transfer: TransferSender,
+    ) -> Result<Vec<u8>> {
         let reader = match start_pos {
             Some(start_position) => {
                 self.operator
@@ -186,17 +192,16 @@ impl Client {
         let mut stream =
             reader
                 .into_async_read()
-                .report_progress(Duration::from_secs(2), |bytes_read| {
-                    use humansize::{file_size_opts as options, FileSize};
-
-                    tracing::debug!(
-                        "reading `{}`… {}/{}",
-                        path,
-                        bytes_read
-                            .file_size(options::BINARY)
-                            .expect("never negative"),
-                        size.file_size(options::BINARY).expect("never negative")
-                    )
+                .report_progress(Duration::from_secs(1), |bytes_read| {
+                    transfer
+                        .send(TransferType::Download(
+                            path.to_string(),
+                            TransferItem {
+                                total: size,
+                                current: bytes_read as u64,
+                            },
+                        ))
+                        .unwrap();
                 });
 
         stream
@@ -207,11 +212,16 @@ impl Client {
         Ok(body)
     }
 
-    pub async fn download_file(&self, obj: &str, target: PathBuf) -> Result<()> {
+    pub async fn download_file(
+        &self,
+        obj: &str,
+        target: PathBuf,
+        transfer: TransferSender,
+    ) -> Result<()> {
         let mut new_file = PartialFile::create(&target)
             .with_context(|| format!("create `{}`", target.display()))?;
 
-        let content = self.streaming_read(obj, None).await?;
+        let content = self.streaming_read(obj, None, transfer).await?;
 
         new_file
             .write_all(&content)
@@ -221,7 +231,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn put(&self, path: PathBuf, dest: &str) -> Result<()> {
+    pub async fn put(&self, path: PathBuf, dest: &str, transfer: &TransferSender) -> Result<()> {
         let name = get_name(&path);
         let key = format!("{dest}{name}");
 
@@ -230,13 +240,22 @@ impl Client {
                 panic!("Could not open sample file: {}", e);
             })
             .unwrap();
+        let progress_tx = transfer.clone();
 
-        body.set_callback(move |tot_size: u64, sent: u64, cur_buf: u64| {
-            tracing::debug!("Upload progress: {cur_buf}/{tot_size}");
-            if sent == tot_size {
-                tracing::debug!("Upload Done!");
-            }
-        });
+        body.set_callback(
+            &key,
+            move |key: &str, tot_size: u64, sent: u64, _cur_buf: u64| {
+                progress_tx
+                    .send(TransferType::Upload(
+                        key.to_string(),
+                        TransferItem {
+                            total: tot_size,
+                            current: sent,
+                        },
+                    ))
+                    .unwrap();
+            },
+        );
 
         let mut uploader = self.streaming_upload(&key)?;
         while let Ok(Some(bytes)) = body.try_next().await {
@@ -248,10 +267,15 @@ impl Client {
         Ok(())
     }
 
-    pub async fn put_multi(&self, paths: Vec<PathBuf>, dest: String) -> Result<Vec<String>> {
+    pub async fn put_multi(
+        &self,
+        paths: Vec<PathBuf>,
+        dest: String,
+        transfer: TransferSender,
+    ) -> Result<Vec<String>> {
         let mut results = vec![];
         for path in paths {
-            match self.put(path, &dest).await {
+            match self.put(path, &dest, &transfer).await {
                 Ok(_) => results.push("upload success".into()),
                 Err(err) => results.push(err.to_string()),
             }
@@ -301,7 +325,6 @@ impl ClientBuilder {
     }
 
     pub fn build(self) -> Result<Client> {
-        util::check_bucket_name(&self.config.bucket)?;
         Client::new(self.config)
     }
 }

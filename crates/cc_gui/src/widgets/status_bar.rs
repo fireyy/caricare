@@ -50,7 +50,7 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                 } else {
                     n_color
                 };
-                let transfer_color = if state.is_show_transfer {
+                let transfer_color = if state.transfer_manager.is_show {
                     style.hyperlink_color
                 } else {
                     n_color
@@ -90,7 +90,7 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                         .on_hover_text("Transfer")
                         .clicked()
                     {
-                        state.is_show_transfer = !state.is_show_transfer;
+                        state.transfer_manager.is_show = !state.transfer_manager.is_show;
                     }
                 });
             });

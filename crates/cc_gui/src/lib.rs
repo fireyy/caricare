@@ -21,4 +21,17 @@ macro_rules! spawn_evs {
     }};
 }
 
+macro_rules! spawn_transfer {
+    ($state:ident, |$transfer:ident, $ev:ident, $client:ident, $ctx:ident| $fut:tt) => {{
+        let $client = $state.oss().clone();
+        let $transfer = $state.transfer_manager.progress_tx.clone();
+        let $ev = $state.update_tx.clone();
+        let $ctx = $state.ctx.clone();
+        cc_runtime::spawn(async move {
+            cc_runtime::tokio::task::spawn(async move { $fut });
+        });
+    }};
+}
+
 pub(crate) use spawn_evs;
+pub(crate) use spawn_transfer;

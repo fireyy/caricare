@@ -25,7 +25,7 @@ const DEFAULT_BUFFER_SIZE: usize = 2048;
 /// * `u64`: The total length of the buffer (or size of the file if created from a `PathBuf`)
 /// * `u64`: The total number of bytes read so far
 /// * `u64`: The number of bytes read in the current chunck
-type CallbackFn = dyn Fn(u64, u64, u64) + Sync + Send + 'static;
+type CallbackFn = dyn FnMut(&str, u64, u64, u64) + Sync + Send + 'static;
 
 /// A `futures::Stream` implementation that can be used to track uploads
 /// ```
@@ -33,6 +33,7 @@ pub struct TrackableBodyStream<I: AsyncReadExt + Unpin> {
     input: I,
     file_size: u64,
     cur_read: u64,
+    key: String,
     callback: Option<Box<CallbackFn>>,
     buffer_size: usize,
 }
@@ -47,49 +48,22 @@ impl TryFrom<PathBuf> for TrackableBodyStream<File> {
             input: file,
             file_size,
             cur_read: 0,
+            key: String::new(),
             callback: None,
             buffer_size: DEFAULT_BUFFER_SIZE,
         })
     }
 }
 
-impl<'inputlife> From<&'inputlife [u8]> for TrackableBodyStream<&'inputlife [u8]> {
-    fn from(value: &'inputlife [u8]) -> Self {
-        let length = value.len();
-        Self {
-            input: value,
-            file_size: length as u64,
-            cur_read: 0,
-            callback: None,
-            buffer_size: DEFAULT_BUFFER_SIZE,
-        }
-    }
-}
-
 impl<I: AsyncReadExt + Unpin + Send + Sync + 'static> TrackableBodyStream<I> {
-    /// Sets the callback method for the `TrackableBodyStream` and returns the populated
-    /// stream.
-    pub fn with_callback(
-        mut self,
-        callback: impl Fn(u64, u64, u64) + Sync + Send + 'static,
-    ) -> Self {
-        self.callback = Some(Box::new(callback));
-        self
-    }
-
     /// Sets the callback method
-    pub fn set_callback(&mut self, callback: impl Fn(u64, u64, u64) + Sync + Send + 'static) {
+    pub fn set_callback(
+        &mut self,
+        key: &str,
+        callback: impl FnMut(&str, u64, u64, u64) + Sync + Send + 'static,
+    ) {
+        self.key = key.to_string();
         self.callback = Some(Box::new(callback));
-    }
-
-    /// Makes it easier to customize the size of the buffer used while reading from source
-    pub fn set_buffer_size(&mut self, buffer_size: usize) {
-        self.buffer_size = buffer_size;
-    }
-
-    /// This returns the size of the input file or slice.
-    pub fn content_length(&self) -> i64 {
-        self.file_size as i64
     }
 }
 
@@ -115,7 +89,8 @@ impl<I: AsyncReadExt + Unpin> Stream for TrackableBodyStream<I> {
                 mut_self.cur_read += read_op as u64;
                 //buf.resize(read_op, 0u8);
                 if mut_self.callback.is_some() {
-                    mut_self.callback.as_ref().unwrap()(
+                    mut_self.callback.as_mut().unwrap()(
+                        mut_self.key.as_str(),
                         mut_self.file_size,
                         mut_self.cur_read,
                         read_op as u64,
@@ -162,10 +137,6 @@ impl StreamingUploader {
 
         Ok(())
     }
-
-    fn get_memory_usage(&self) -> u64 {
-        self.buffer.capacity() as u64
-    }
 }
 
 /// Reader for the `report_progress` method.
@@ -192,11 +163,11 @@ impl<St, F: FnMut(usize)> StreamDownloader<St, F> {
         state.bytes_read += bytes_read;
         let read = state.bytes_read;
 
-        if state.last_call_at.elapsed() >= state.at_most_ever {
-            (self.as_mut().callback())(read);
+        // if state.last_call_at.elapsed() >= state.at_most_ever {
+        (self.as_mut().callback())(read);
 
-            self.as_mut().state().last_call_at = Instant::now();
-        }
+        //     self.as_mut().state().last_call_at = Instant::now();
+        // }
     }
 }
 
@@ -212,7 +183,7 @@ where
     St: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LogStreamProgress")
+        f.debug_struct("StreamDownloader")
             .field("stream", &self.inner)
             .field("at_most_ever", &self.state.at_most_ever)
             .field("last_call_at", &self.state.last_call_at)

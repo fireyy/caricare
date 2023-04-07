@@ -1,15 +1,16 @@
-use crate::spawn_evs;
 use crate::theme;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
     file_view_ui, log_panel_ui, transfer_panel_ui,
 };
+use crate::{spawn_evs, spawn_transfer};
 use cc_core::{log::LogItem, store, tracing, MemoryHistory, Session, Setting};
 use cc_files::Cache as ImageCache;
 use egui_notify::Toasts;
 use oss_sdk::util::get_name_form_path;
 use oss_sdk::{
     Bucket, Client as OssClient, ListObjects, Metadata, Object, Params, Result as OssResult,
+    TransferManager,
 };
 use std::{path::PathBuf, sync::mpsc, vec};
 
@@ -45,7 +46,7 @@ pub enum FileAction {
 }
 
 pub enum Update {
-    Uploaded(OssResult<Vec<String>>),
+    TransferResult,
     List(OssResult<ListObjects>),
     Navgator(NavgatorType),
     Deleted(OssResult<()>),
@@ -94,8 +95,7 @@ pub struct State {
     pub ctx: egui::Context,
     pub bucket: Option<Bucket>,
     pub file_action: Option<FileAction>,
-    pub is_show_transfer: bool,
-    pub transfer_filter_str: String,
+    pub transfer_manager: TransferManager,
 }
 
 impl State {
@@ -175,8 +175,7 @@ impl State {
             ctx: ctx.clone(),
             bucket,
             file_action: None,
-            is_show_transfer: false,
-            transfer_filter_str: String::new(),
+            transfer_manager: TransferManager::new(),
         };
 
         this.next_query = Some(this.build_query(None));
@@ -189,23 +188,15 @@ impl State {
     pub fn init(&mut self, ctx: &egui::Context) {
         self.file_cache.poll();
         self.init_confirm(ctx);
+        let ctx_clone = ctx.clone();
+        self.transfer_manager
+            .poll(move || ctx_clone.request_repaint());
         self.selected_item = self.list.iter().filter(|x| x.selected).count();
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
-                Update::Uploaded(result) => match result {
-                    Ok(str) => {
-                        self.status = Status::Idle(Route::List);
-                        for s in str {
-                            self.logs.push(LogItem::upload().with_info(s));
-                        }
-                        self.refresh();
-                    }
-                    Err(err) => {
-                        self.status = Status::Idle(Route::Upload);
-                        self.logs
-                            .push(LogItem::upload().with_error(err.to_string()));
-                    }
-                },
+                Update::TransferResult => {
+                    self.refresh();
+                }
                 Update::List(result) => match result {
                     Ok(str) => {
                         if let Some(token) = str.next_continuation_token() {
@@ -397,13 +388,13 @@ impl State {
         }
         let picked_path = self.picked_path.clone();
         self.picked_path = vec![];
-        // self.status = Status::Busy(Route::Upload);
 
         let dest = self.current_path.clone();
+        self.transfer_manager.show();
 
-        spawn_evs!(self, |evs, client, ctx| {
-            let res = client.put_multi(picked_path, dest).await;
-            evs.send(Update::Uploaded(res)).unwrap();
+        spawn_transfer!(self, |transfer, evs, client, ctx| {
+            let _ = client.put_multi(picked_path, dest, transfer).await;
+            evs.send(Update::TransferResult).unwrap();
             ctx.request_repaint();
         });
     }
@@ -632,23 +623,13 @@ impl State {
         sessions
     }
 
-    pub fn download_file(&self, name: String) {
+    pub fn download_file(&mut self, name: String) {
         let file_name = get_name_form_path(&name);
+        self.transfer_manager.show();
         if let Some(path) = rfd::FileDialog::new().set_file_name(&file_name).save_file() {
-            spawn_evs!(self, |evs, client, ctx| {
-                let _res = client.download_file(&name, path).await;
-                // if let Ok((_name, data)) = res {
-                //     match std::fs::write(path, data) {
-                //         Ok(_) => evs
-                //             .send(Update::Success("Download success.".into()))
-                //             .unwrap(),
-                //         Err(_) => evs.send(Update::Error("Download failed.".into())).unwrap(),
-                //     }
-                // } else {
-                //     evs.send(Update::Error("Download failed.".into())).unwrap();
-                // }
-                evs.send(Update::Success("Download success.".into()))
-                    .unwrap();
+            spawn_transfer!(self, |transfer, evs, client, ctx| {
+                let _ = client.download_file(&name, path, transfer).await;
+                evs.send(Update::TransferResult).unwrap();
                 ctx.request_repaint();
             });
         }
