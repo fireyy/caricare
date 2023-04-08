@@ -8,14 +8,14 @@ use crate::partial_file::PartialFile;
 use crate::transfer::{TransferItem, TransferSender, TransferType};
 use crate::types::{Bucket, ListObjects, Object, Params};
 use crate::util::get_name;
-use crate::Result;
+use crate::{CustomLayer, Result};
 use anyhow::Context;
 
 use crate::stream::{
     AsyncReadProgressExt, BoxedStreamingUploader, StreamingUploader, TrackableBodyStream,
 };
 use futures::{AsyncReadExt, TryStreamExt};
-use opendal::services::Oss;
+use opendal::services;
 use opendal::{Metadata, Metakey, Operator};
 
 #[derive(Clone)]
@@ -34,12 +34,13 @@ impl Client {
     fn new(config: ClientConfig) -> Result<Client> {
         let config = Arc::new(config);
 
-        let mut builder = Oss::default();
+        let mut builder = services::S3::default();
         builder.bucket(&config.bucket);
         builder.endpoint(&config.endpoint);
         builder.access_key_id(&config.access_key_id);
-        builder.access_key_secret(&config.access_key_secret);
-        let operator: Operator = Operator::new(builder)?.finish();
+        // builder.access_key_secret(&config.access_key_secret);
+        builder.secret_access_key(&config.access_key_secret);
+        let operator: Operator = Operator::new(builder)?.layer(CustomLayer).finish();
 
         Ok(Client { config, operator })
     }
@@ -108,7 +109,7 @@ impl Client {
         let mut common_prefixes = Vec::new();
         let mut objects = Vec::new();
 
-        while let Some(entry) = stream.try_next().await? {
+        if let Some(entry) = stream.try_next().await? {
             let meta = self
                 .operator
                 .metadata(

@@ -12,7 +12,7 @@ use oss_sdk::{
     Bucket, Client as OssClient, ListObjects, Metadata, Object, Params, Result as OssResult,
     TransferManager,
 };
-use std::{path::PathBuf, sync::mpsc, vec};
+use std::{path::PathBuf, vec};
 
 #[derive(PartialEq)]
 pub enum Status {
@@ -66,9 +66,9 @@ pub struct State {
     pub list: Vec<Object>,
     pub current_object: Object,
     //TODO: use crossbeam or flume
-    pub update_tx: mpsc::SyncSender<Update>,
-    pub update_rx: mpsc::Receiver<Update>,
-    pub confirm_rx: mpsc::Receiver<ConfirmAction>,
+    pub update_tx: crossbeam_channel::Sender<Update>,
+    pub update_rx: crossbeam_channel::Receiver<Update>,
+    pub confirm_rx: crossbeam_channel::Receiver<ConfirmAction>,
     pub setting: Setting,
     pub is_preview: bool,
     pub img_zoom: f32,
@@ -109,8 +109,8 @@ impl State {
         let mut oss = None;
         let mut bucket = None;
 
-        let (update_tx, update_rx) = mpsc::sync_channel(1);
-        let (confirm_tx, confirm_rx) = mpsc::sync_channel(1);
+        let (update_tx, update_rx) = crossbeam_channel::unbounded();
+        let (confirm_tx, confirm_rx) = crossbeam_channel::bounded(1);
 
         let mut current_path = String::from("");
         let navigator = MemoryHistory::new();

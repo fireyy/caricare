@@ -2213,6 +2213,7 @@ name = "oss_sdk"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bytes",
  "bytesize",
  "crossbeam-channel",
