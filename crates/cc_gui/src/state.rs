@@ -390,7 +390,7 @@ impl State {
         self.picked_path = vec![];
 
         let dest = self.current_path.clone();
-        self.transfer_manager.show();
+        self.transfer_manager.show("upload");
 
         spawn_transfer!(self, |transfer, evs, client, ctx| {
             let _ = client.put_multi(picked_path, dest, transfer).await;
@@ -625,7 +625,7 @@ impl State {
 
     pub fn download_file(&mut self, name: String) {
         let file_name = get_name_form_path(&name);
-        self.transfer_manager.show();
+        self.transfer_manager.show("download");
         if let Some(path) = rfd::FileDialog::new().set_file_name(&file_name).save_file() {
             spawn_transfer!(self, |transfer, evs, client, ctx| {
                 let _ = client.download_file(&name, path, transfer).await;

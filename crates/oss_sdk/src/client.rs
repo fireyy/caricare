@@ -40,6 +40,7 @@ impl Client {
         builder.access_key_id(&config.access_key_id);
         // builder.access_key_secret(&config.access_key_secret);
         builder.secret_access_key(&config.access_key_secret);
+        // builder.enable_virtual_host_style();
         let operator: Operator = Operator::new(builder)?.layer(CustomLayer).finish();
 
         Ok(Client { config, operator })
@@ -109,7 +110,7 @@ impl Client {
         let mut common_prefixes = Vec::new();
         let mut objects = Vec::new();
 
-        if let Some(entry) = stream.try_next().await? {
+        while let Some(entry) = stream.try_next().await? {
             let meta = self
                 .operator
                 .metadata(

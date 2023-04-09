@@ -61,8 +61,9 @@ impl TransferManager {
         self.downloads.len() + self.uploads.len()
     }
 
-    pub fn show(&mut self) {
+    pub fn show(&mut self, t_type: &str) {
         self.is_show = true;
+        self.t_type = t_type.to_string();
     }
 
     pub fn close(&mut self) {
