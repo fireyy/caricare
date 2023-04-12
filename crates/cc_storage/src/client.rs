@@ -84,7 +84,7 @@ impl Client {
 
     pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<()> {
         let object = object.as_ref();
-        let _ = self.operator.delete(object).await?;
+        self.operator.delete(object).await?;
         // TODO: check `object` if delete success
 
         Ok(())
@@ -105,7 +105,7 @@ impl Client {
 
     pub async fn list_v2(&self, query: Option<String>) -> Result<ListObjects> {
         tracing::debug!("List object: {:?}", query);
-        let path = query.map_or("".into(), |x| format!("{}/", x));
+        let path = query.map_or("".into(), |x| format!("{x}/"));
         let mut stream = self.operator.list(&path).await?;
 
         let mut list_objects = ListObjects::default();
@@ -146,7 +146,7 @@ impl Client {
         };
         tracing::debug!("Create folder: {}", path);
 
-        let _ = self.operator.create_dir(&path).await?;
+        self.operator.create_dir(&path).await?;
         // TODO: use `stat` to check create dir result
 
         Ok(())
@@ -238,7 +238,7 @@ impl Client {
 
         let mut body = TrackableBodyStream::try_from(path)
             .map_err(|e| {
-                panic!("Could not open sample file: {}", e);
+                panic!("Could not open sample file: {e}");
             })
             .unwrap();
         let progress_tx = transfer.clone();

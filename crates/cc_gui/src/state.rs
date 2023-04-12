@@ -56,8 +56,6 @@ pub enum Update {
     BucketInfo(ClientResult<Bucket>),
     Copied(ClientResult<(String, bool)>),
     DownloadObject(String),
-    Success(String),
-    Error(String),
 }
 
 pub struct State {
@@ -312,12 +310,6 @@ impl State {
                 },
                 Update::DownloadObject(name) => {
                     self.download_file(name);
-                }
-                Update::Success(result) => {
-                    self.toasts.success(result);
-                }
-                Update::Error(result) => {
-                    self.toasts.error(result);
                 }
             }
         }

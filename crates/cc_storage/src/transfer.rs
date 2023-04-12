@@ -31,6 +31,12 @@ pub struct TransferManager {
     pub progress_rx: crossbeam_channel::Receiver<TransferType>,
 }
 
+impl Default for TransferManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TransferManager {
     pub fn new() -> Self {
         let (progress_tx, progress_rx) = unbounded();

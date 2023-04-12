@@ -193,7 +193,7 @@ pub trait AsyncReadProgressExt {
 
 impl<R: FAsyncRead + ?Sized> AsyncReadProgressExt for R {}
 
-impl<'a, St, F> FAsyncRead for StreamDownloader<St, F>
+impl<St, F> FAsyncRead for StreamDownloader<St, F>
 where
     St: FAsyncRead,
     F: FnMut(usize),
