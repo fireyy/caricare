@@ -3,6 +3,7 @@ use core::{
     task::{Context, Poll},
 };
 use futures::io::{AsyncRead as FAsyncRead, IoSliceMut};
+use pin_project::pin_project;
 use std::path::PathBuf;
 use std::{fmt, io};
 
@@ -137,32 +138,13 @@ impl StreamingUploader {
 }
 
 /// Reader for the `report_progress` method.
+#[pin_project]
 #[must_use = "streams do nothing unless polled"]
 pub struct StreamDownloader<St, F> {
+    #[pin]
     inner: St,
     callback: F,
     bytes_read: usize,
-}
-
-impl<St, F: FnMut(usize)> StreamDownloader<St, F> {
-    pin_utils::unsafe_pinned!(inner: St);
-    pin_utils::unsafe_unpinned!(callback: F);
-    pin_utils::unsafe_unpinned!(bytes_read: usize);
-
-    fn update(mut self: Pin<&mut Self>, bytes_read: usize) {
-        let mut_bytes_read = self.as_mut().bytes_read();
-        *mut_bytes_read += bytes_read;
-        let read = *mut_bytes_read;
-
-        (self.as_mut().callback())(read);
-    }
-}
-
-impl<T, U> Unpin for StreamDownloader<T, U>
-where
-    T: Unpin,
-    U: Unpin,
-{
 }
 
 impl<St, F> fmt::Debug for StreamDownloader<St, F>
@@ -199,30 +181,34 @@ where
     F: FnMut(usize),
 {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        match self.as_mut().inner().poll_read(cx, buf) {
+        let this = self.project();
+        match this.inner.poll_read(cx, buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
             Poll::Ready(Ok(bytes_read)) => {
-                self.update(bytes_read);
+                *this.bytes_read += bytes_read;
+                (this.callback)(*this.bytes_read);
                 Poll::Ready(Ok(bytes_read))
             }
         }
     }
 
     fn poll_read_vectored(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &mut [IoSliceMut<'_>],
     ) -> Poll<io::Result<usize>> {
-        match self.as_mut().inner().poll_read_vectored(cx, bufs) {
+        let this = self.project();
+        match this.inner.poll_read_vectored(cx, bufs) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
             Poll::Ready(Ok(bytes_read)) => {
-                self.update(bytes_read);
+                *this.bytes_read += bytes_read;
+                (this.callback)(*this.bytes_read);
                 Poll::Ready(Ok(bytes_read))
             }
         }
