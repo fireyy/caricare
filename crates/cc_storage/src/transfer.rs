@@ -4,28 +4,28 @@ use std::collections::BTreeMap;
 pub type TransferSender = crossbeam_channel::Sender<TransferType>;
 
 #[derive(Clone, Default, Debug)]
-pub struct TransferItem {
-    pub total: u64,
-    pub current: u64,
+pub struct TransferProgressInfo {
+    pub total_bytes: u64,
+    pub transferred_bytes: u64,
 }
 
-impl TransferItem {
+impl TransferProgressInfo {
     pub fn rate(&self) -> f32 {
-        (self.current as f64 / self.total as f64) as f32
+        (self.transferred_bytes as f64 / self.total_bytes as f64) as f32
     }
 }
 
 #[derive(Clone)]
 pub enum TransferType {
-    Download(String, TransferItem),
-    Upload(String, TransferItem),
+    Download(String, TransferProgressInfo),
+    Upload(String, TransferProgressInfo),
 }
 
 pub struct TransferManager {
     pub is_show: bool,
     pub t_type: String,
-    downloads: BTreeMap<String, TransferItem>,
-    uploads: BTreeMap<String, TransferItem>,
+    downloads: BTreeMap<String, TransferProgressInfo>,
+    uploads: BTreeMap<String, TransferProgressInfo>,
     pub filter: String,
     pub progress_tx: crossbeam_channel::Sender<TransferType>,
     pub progress_rx: crossbeam_channel::Receiver<TransferType>,
@@ -45,7 +45,7 @@ impl TransferManager {
         }
     }
 
-    pub fn data(&self) -> &BTreeMap<String, TransferItem> {
+    pub fn data(&self) -> &BTreeMap<String, TransferProgressInfo> {
         if self.is_upload() {
             &self.uploads
         } else {
@@ -85,17 +85,17 @@ impl TransferManager {
         }
     }
 
-    fn update_download(&mut self, key: String, item: TransferItem) {
+    fn update_download(&mut self, key: String, item: TransferProgressInfo) {
         // tracing::debug!("Download `{key}`… {}/{}", item.current, item.total);
-        if item.current == item.total {
+        if item.transferred_bytes == item.total_bytes {
             tracing::debug!("Download Done!");
         }
         self.downloads.insert(key, item);
     }
 
-    fn update_upload(&mut self, key: String, item: TransferItem) {
+    fn update_upload(&mut self, key: String, item: TransferProgressInfo) {
         // tracing::debug!("Upload `{key}`… {}/{}", item.current, item.total);
-        if item.current == item.total {
+        if item.transferred_bytes == item.total_bytes {
             tracing::debug!("Upload Done!");
         }
         self.uploads.insert(key, item);

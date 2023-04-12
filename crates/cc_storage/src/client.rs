@@ -1,11 +1,10 @@
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::config::ClientConfig;
 use crate::partial_file::PartialFile;
-use crate::transfer::{TransferItem, TransferSender, TransferType};
+use crate::transfer::{TransferProgressInfo, TransferSender, TransferType};
 use crate::types::{Bucket, ListObjects, Object, Params};
 use crate::util::get_name;
 use crate::{CustomLayer, Result};
@@ -40,7 +39,10 @@ impl Client {
         builder.access_key_id(&config.access_key_id);
         // builder.access_key_secret(&config.access_key_secret);
         builder.secret_access_key(&config.access_key_secret);
-        // builder.enable_virtual_host_style();
+        // OSS need enable virtual host style
+        if config.endpoint.contains("aliyuncs.com") {
+            builder.enable_virtual_host_style();
+        }
         let operator: Operator = Operator::new(builder)?.layer(CustomLayer).finish();
 
         Ok(Client { config, operator })
@@ -191,20 +193,17 @@ impl Client {
         let size = self.head_object(path).await?.content_length();
         let mut body = Vec::new();
 
-        let mut stream =
-            reader
-                .into_async_read()
-                .report_progress(Duration::from_secs(1), |bytes_read| {
-                    transfer
-                        .send(TransferType::Download(
-                            path.to_string(),
-                            TransferItem {
-                                total: size,
-                                current: bytes_read as u64,
-                            },
-                        ))
-                        .unwrap();
-                });
+        let mut stream = reader.into_async_read().report_progress(|bytes_read| {
+            transfer
+                .send(TransferType::Download(
+                    path.to_string(),
+                    TransferProgressInfo {
+                        total_bytes: size,
+                        transferred_bytes: bytes_read as u64,
+                    },
+                ))
+                .unwrap();
+        });
 
         stream
             .read_to_end(&mut body)
@@ -250,9 +249,9 @@ impl Client {
                 progress_tx
                     .send(TransferType::Upload(
                         key.to_string(),
-                        TransferItem {
-                            total: tot_size,
-                            current: sent,
+                        TransferProgressInfo {
+                            total_bytes: tot_size,
+                            transferred_bytes: sent,
                         },
                     ))
                     .unwrap();

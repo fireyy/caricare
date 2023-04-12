@@ -3,7 +3,7 @@ use super::location_bar_ui;
 use crate::state::{FileAction, NavgatorType, Route, State, Status, Update};
 use crate::theme::icon;
 use cc_core::ShowType;
-use oss_sdk::util::get_name_form_path;
+use cc_storage::util::get_name_form_path;
 
 pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {
     let native_pixels_per_point = frame.info().native_pixels_per_point;

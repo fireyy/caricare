@@ -4,10 +4,7 @@ use core::{
 };
 use futures::io::{AsyncRead as FAsyncRead, IoSliceMut};
 use std::path::PathBuf;
-use std::{
-    fmt, io,
-    time::{Duration, Instant},
-};
+use std::{fmt, io};
 
 use futures::{Future, Stream};
 use tokio::{fs::File, io::AsyncReadExt};
@@ -144,30 +141,20 @@ impl StreamingUploader {
 pub struct StreamDownloader<St, F> {
     inner: St,
     callback: F,
-    state: ProgressState,
-}
-
-struct ProgressState {
     bytes_read: usize,
-    at_most_ever: Duration,
-    last_call_at: Instant,
 }
 
 impl<St, F: FnMut(usize)> StreamDownloader<St, F> {
     pin_utils::unsafe_pinned!(inner: St);
     pin_utils::unsafe_unpinned!(callback: F);
-    pin_utils::unsafe_unpinned!(state: ProgressState);
+    pin_utils::unsafe_unpinned!(bytes_read: usize);
 
     fn update(mut self: Pin<&mut Self>, bytes_read: usize) {
-        let mut state = self.as_mut().state();
-        state.bytes_read += bytes_read;
-        let read = state.bytes_read;
+        let mut_bytes_read = self.as_mut().bytes_read();
+        *mut_bytes_read += bytes_read;
+        let read = *mut_bytes_read;
 
-        // if state.last_call_at.elapsed() >= state.at_most_ever {
         (self.as_mut().callback())(read);
-
-        //     self.as_mut().state().last_call_at = Instant::now();
-        // }
     }
 }
 
@@ -185,27 +172,21 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StreamDownloader")
             .field("stream", &self.inner)
-            .field("at_most_ever", &self.state.at_most_ever)
-            .field("last_call_at", &self.state.last_call_at)
             .finish()
     }
 }
 
 pub trait AsyncReadProgressExt {
-    fn report_progress<F>(self, at_most_ever: Duration, callback: F) -> StreamDownloader<Self, F>
+    fn report_progress<F>(self, callback: F) -> StreamDownloader<Self, F>
     where
         Self: Sized,
         F: FnMut(usize),
     {
-        let state = ProgressState {
-            bytes_read: 0,
-            at_most_ever,
-            last_call_at: Instant::now(),
-        };
+        let bytes_read = 0;
         StreamDownloader {
             inner: self,
             callback,
-            state,
+            bytes_read,
         }
     }
 }

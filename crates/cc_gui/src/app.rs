@@ -10,7 +10,7 @@ impl App {
         let state = State::new(&cc.egui_ctx);
         let mut this = Self { state };
 
-        if this.state.oss.is_some() {
+        if this.state.client.is_some() {
             this.state.get_list();
         }
 

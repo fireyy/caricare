@@ -1,5 +1,5 @@
 [package]
-name = "oss_sdk"
+name = "cc_storage"
 version = "0.1.0"
 edition = "2021"
 

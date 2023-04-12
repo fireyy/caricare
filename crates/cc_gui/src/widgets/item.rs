@@ -1,8 +1,8 @@
 use crate::theme::text_ellipsis;
 use cc_core::util::is_vaild_img;
 use cc_files::Cache as FileCache;
+use cc_storage::Object;
 use egui::RichText;
-use oss_sdk::Object;
 
 pub fn item_ui(
     ui: &mut egui::Ui,

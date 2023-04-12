@@ -6,12 +6,11 @@ use crate::widgets::{
 use crate::{spawn_evs, spawn_transfer};
 use cc_core::{log::LogItem, store, tracing, MemoryHistory, Session, Setting};
 use cc_files::Cache as ImageCache;
-use egui_notify::Toasts;
-use oss_sdk::util::get_name_form_path;
-use oss_sdk::{
-    Bucket, Client as OssClient, ListObjects, Metadata, Object, Params, Result as OssResult,
-    TransferManager,
+use cc_storage::util::get_name_form_path;
+use cc_storage::{
+    Bucket, Client, ListObjects, Metadata, Object, Params, Result as ClientResult, TransferManager,
 };
+use egui_notify::Toasts;
 use std::{path::PathBuf, vec};
 
 #[derive(PartialEq)]
@@ -47,22 +46,22 @@ pub enum FileAction {
 
 pub enum Update {
     TransferResult,
-    List(OssResult<ListObjects>),
+    List(ClientResult<ListObjects>),
     Navgator(NavgatorType),
-    Deleted(OssResult<()>),
-    CreateFolder(OssResult<()>),
+    Deleted(ClientResult<()>),
+    CreateFolder(ClientResult<()>),
     ViewObject(Object),
-    HeadObject(OssResult<Metadata>),
-    GetObject(OssResult<(String, Vec<u8>)>),
-    BucketInfo(OssResult<Bucket>),
-    Copied(OssResult<(String, bool)>),
+    HeadObject(ClientResult<Metadata>),
+    GetObject(ClientResult<(String, Vec<u8>)>),
+    BucketInfo(ClientResult<Bucket>),
+    Copied(ClientResult<(String, bool)>),
     DownloadObject(String),
     Success(String),
     Error(String),
 }
 
 pub struct State {
-    pub oss: Option<OssClient>,
+    pub client: Option<Client>,
     pub list: Vec<Object>,
     pub current_object: Object,
     //TODO: use crossbeam or flume
@@ -106,7 +105,7 @@ impl State {
             None => Session::default(),
         };
 
-        let mut oss = None;
+        let mut client = None;
         let mut bucket = None;
 
         let (update_tx, update_rx) = crossbeam_channel::unbounded();
@@ -122,18 +121,20 @@ impl State {
 
         let setting = Setting::load();
 
-        if !session.is_empty() && setting.auto_login {
-            match OssClient::builder()
+        let is_need_init = !session.is_empty() && setting.auto_login;
+
+        if is_need_init {
+            match Client::builder()
                 .endpoint(&session.endpoint)
                 .access_key(&session.key_id)
                 .access_secret(&session.key_secret)
                 .bucket(&session.bucket)
                 .build()
             {
-                Ok(client) => {
+                Ok(cli) => {
                     bucket = Some(Bucket::default());
                     current_path = "".to_string();
-                    oss = Some(client);
+                    client = Some(cli);
                     navigator.push(current_path.clone());
                 }
                 Err(err) => tracing::error!("{:?}", err),
@@ -144,7 +145,7 @@ impl State {
 
         let mut this = Self {
             setting,
-            oss,
+            client,
             current_object: Object::default(),
             list: vec![],
             update_tx,
@@ -180,7 +181,10 @@ impl State {
 
         this.next_query = Some(this.build_query(None));
         this.sessions = this.load_all_session();
-        this.get_bucket_info();
+
+        if is_need_init {
+            this.get_bucket_info();
+        }
 
         this
     }
@@ -337,7 +341,7 @@ impl State {
             self.dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
         }
 
-        if self.oss.is_some() {
+        if self.client.is_some() {
             file_view_ui(ctx, self);
             log_panel_ui(ctx, self);
             transfer_panel_ui(ctx, self);
@@ -346,8 +350,8 @@ impl State {
         self.toasts.show(ctx);
     }
 
-    pub fn oss(&self) -> &OssClient {
-        self.oss.as_ref().expect("Oss not initialized yet")
+    pub fn client(&self) -> &Client {
+        self.client.as_ref().expect("Oss not initialized yet")
     }
 
     pub fn bucket(&self) -> &Bucket {
@@ -358,11 +362,11 @@ impl State {
         self.bucket().is_private()
     }
 
-    pub fn get_signature_url(&self, name: &str, expire: i64) -> OssResult<String> {
+    pub fn get_signature_url(&self, name: &str, expire: i64) -> ClientResult<String> {
         if self.bucket_is_private() {
-            self.oss().signature_url(name, expire, None)
+            self.client().signature_url(name, expire, None)
         } else {
-            Ok(format!("{}/{name}", self.oss().get_bucket_url()))
+            Ok(format!("{}/{name}", self.client().get_bucket_url()))
         }
     }
 
@@ -373,11 +377,13 @@ impl State {
                 "x-oss-process".into(),
                 Some(format!("image/resize,w_{size}")),
             );
-            self.oss().signature_url(name, 3600, Some(params)).unwrap()
+            self.client()
+                .signature_url(name, 3600, Some(params))
+                .unwrap()
         } else {
             format!(
                 "{}/{name}?x-oss-process=image/resize,w_{size}",
-                self.oss().get_bucket_url(),
+                self.client().get_bucket_url(),
             )
         }
     }
@@ -546,9 +552,9 @@ impl State {
         query
     }
 
-    pub fn login(&mut self) -> OssResult<()> {
+    pub fn login(&mut self) -> ClientResult<()> {
         tracing::debug!("Login with session: {:?}", self.session);
-        let client = OssClient::builder()
+        let client = Client::builder()
             .endpoint(&self.session.endpoint)
             .access_key(&self.session.key_id)
             .access_secret(&self.session.key_secret)
@@ -559,7 +565,7 @@ impl State {
         let current_path = "".to_string();
         self.current_path = current_path.clone();
         self.navigator.push(current_path);
-        self.oss = Some(client);
+        self.client = Some(client);
         self.get_bucket_info();
         self.refresh();
         self.setting.auto_login = true;
@@ -573,7 +579,7 @@ impl State {
             match action {
                 ConfirmAction::Logout => {
                     self.status = Status::Idle(Route::Auth);
-                    self.oss = None;
+                    self.client = None;
                     self.current_path = String::from("");
                     self.navigator.clear();
                     self.setting.auto_login = false;
