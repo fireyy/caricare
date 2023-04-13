@@ -2,8 +2,6 @@ use crate::state::State;
 use crate::widgets::{confirm::ConfirmAction, password};
 use egui_extras::{Column, TableBuilder};
 
-const SAVE_NOTIF_DURATION: Option<std::time::Duration> = Some(std::time::Duration::from_secs(4));
-
 pub fn auth_page(ctx: &egui::Context, state: &mut State) {
     egui::CentralPanel::default().show(ctx, |ui| {
         egui::Frame::none()
@@ -34,16 +32,10 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                 if ui.button("Login").clicked() {
                     match state.login() {
                         Ok(_) => {
-                            state
-                                .toasts
-                                .success("Success")
-                                .set_duration(SAVE_NOTIF_DURATION);
+                            state.toasts.success("Success");
                         }
                         Err(err) => {
-                            state
-                                .toasts
-                                .error(err.to_string())
-                                .set_duration(SAVE_NOTIF_DURATION);
+                            state.toasts.error(err.to_string());
                         }
                     }
                 }

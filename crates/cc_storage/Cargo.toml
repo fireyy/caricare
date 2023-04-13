@@ -10,8 +10,8 @@ thiserror = "1.0"
 anyhow = "1.0"
 tracing = { workspace = true }
 bytesize = "1.1.0"
-time = { version = "0.3", features = ["macros", "formatting", "parsing"] }
-opendal = "0.30.4"
+chrono = "0.4.24"
+opendal = "0.31.0"
 futures = "0.3"
 bytes = "^1"
 tokio = { version = "^1.0", features = ["fs", "io-util", "sync"] }

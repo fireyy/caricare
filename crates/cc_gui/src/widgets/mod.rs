@@ -7,6 +7,7 @@ mod location_bar;
 mod log_panel;
 mod password;
 mod status_bar;
+pub mod toasts;
 mod top_bar;
 mod transfer_panel;
 

@@ -1,4 +1,5 @@
 use crate::theme;
+use crate::widgets::toasts::Toasts;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
     file_view_ui, log_panel_ui, transfer_panel_ui,
@@ -10,7 +11,7 @@ use cc_storage::util::get_name_form_path;
 use cc_storage::{
     Bucket, Client, ListObjects, Metadata, Object, Params, Result as ClientResult, TransferManager,
 };
-use egui_notify::Toasts;
+// use egui_notify::Toasts;
 use std::{path::PathBuf, vec};
 
 #[derive(PartialEq)]
@@ -56,13 +57,13 @@ pub enum Update {
     BucketInfo(ClientResult<Bucket>),
     Copied(ClientResult<(String, bool)>),
     DownloadObject(String),
+    SignatureUrl(ClientResult<String>),
 }
 
 pub struct State {
     pub client: Option<Client>,
     pub list: Vec<Object>,
     pub current_object: Object,
-    //TODO: use crossbeam or flume
     pub update_tx: crossbeam_channel::Sender<Update>,
     pub update_rx: crossbeam_channel::Receiver<Update>,
     pub confirm_rx: crossbeam_channel::Receiver<ConfirmAction>,
@@ -262,7 +263,7 @@ impl State {
                 }
                 Update::GetObject(result) => match result {
                     Ok((_name, data)) => {
-                        self.file_cache.add(self.current_object.url(), data);
+                        self.file_cache.add(self.current_object.key(), data);
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -271,9 +272,6 @@ impl State {
                 },
                 Update::HeadObject(result) => match result {
                     Ok(headers) => {
-                        if let Ok(url) = self.get_signature_url(self.current_object.key(), 3600) {
-                            self.current_object.set_url(url);
-                        }
                         tracing::debug!("current_img: {:?}", self.current_object);
                         if let Some(mint_type) = headers.content_type() {
                             self.current_object.set_mine_type(mint_type.to_string());
@@ -311,6 +309,15 @@ impl State {
                 Update::DownloadObject(name) => {
                     self.download_file(name);
                 }
+                Update::SignatureUrl(result) => match result {
+                    Ok(url) => {
+                        self.current_object.set_url(url.clone());
+                    }
+                    Err(err) => {
+                        self.toasts.error("Signature Url failed.");
+                        self.logs.push(LogItem::copy().with_error(err.to_string()));
+                    }
+                },
             }
         }
 
@@ -354,30 +361,12 @@ impl State {
         self.bucket().is_private()
     }
 
-    pub fn get_signature_url(&self, name: &str, expire: i64) -> ClientResult<String> {
-        if self.bucket_is_private() {
-            self.client().signature_url(name, expire, None)
-        } else {
-            Ok(format!("{}/{name}", self.client().get_bucket_url()))
-        }
-    }
-
-    pub fn get_thumb_url(&self, name: &str, size: u16) -> String {
-        if self.bucket_is_private() {
-            let mut params = Params::new();
-            params.insert(
-                "x-oss-process".into(),
-                Some(format!("image/resize,w_{size}")),
-            );
-            self.client()
-                .signature_url(name, 3600, Some(params))
-                .unwrap()
-        } else {
-            format!(
-                "{}/{name}?x-oss-process=image/resize,w_{size}",
-                self.client().get_bucket_url(),
-            )
-        }
+    pub fn get_signature_url(&self, name: String, expire: u64) {
+        spawn_evs!(self, |evs, client, ctx| {
+            let res = client.signature_url(&name, expire, None).await;
+            evs.send(Update::SignatureUrl(res)).unwrap();
+            ctx.request_repaint();
+        });
     }
 
     pub fn upload_file(&mut self) {
@@ -590,16 +579,8 @@ impl State {
                     self.delete_multi_object();
                 }
                 ConfirmAction::GenerateUrl(expire) => {
-                    tracing::debug!("ConfirmAction::GenerateUrl({expire})");
                     let name = self.current_object.key();
-                    let result = self.get_signature_url(name, expire);
-                    match result {
-                        Ok(url) => {
-                            self.current_object.set_url(url.clone());
-                            self.file_cache.replace(self.current_object.key(), &url);
-                        }
-                        Err(err) => self.err = Some(err.to_string()),
-                    }
+                    self.get_signature_url(name.to_string(), expire);
                 }
                 ConfirmAction::RenameObject((src, name)) => {
                     let dest = format!("{}{}", self.current_path, name);

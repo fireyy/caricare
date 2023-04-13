@@ -1,19 +1,12 @@
 use crate::theme::text_ellipsis;
-use cc_core::util::is_vaild_img;
-use cc_files::Cache as FileCache;
 use cc_storage::Object;
-use egui::RichText;
+use egui::{self, RichText, Sense};
 
-pub fn item_ui(
-    ui: &mut egui::Ui,
-    data: &Object,
-    url: String,
-    file_cache: &mut FileCache,
-) -> egui::Response {
-    let response = egui::Frame {
+pub fn item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
+    egui::Frame {
         inner_margin: egui::style::Margin::same(5.0),
         outer_margin: egui::style::Margin::same(0.0),
-        fill: ui.style().visuals.faint_bg_color,
+        // fill: fill_color,
         ..egui::Frame::default()
     }
     .show(ui, |ui| {
@@ -26,12 +19,8 @@ pub fn item_ui(
             .show(ui, |ui| {
                 ui.set_width(32.0);
                 ui.set_height(32.0);
-                if data.is_file() && is_vaild_img(data.key()) {
-                    if let Some(file) = file_cache.get(&url) {
-                        let size = egui::vec2(32.0, 32.0);
-                        file.show_size(ui, size);
-                    }
-                }
+                // TODO: show file type icon
+                ui.checkbox(&mut data.selected, "");
             });
             ui.vertical(|ui| {
                 ui.label(text_ellipsis(ui.style(), &data.name(), 1));
@@ -42,7 +31,5 @@ pub fn item_ui(
         });
     })
     .response
-    .interact(egui::Sense::click());
-
-    response
+    .interact(Sense::click())
 }

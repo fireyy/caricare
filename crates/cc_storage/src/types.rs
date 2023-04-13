@@ -1,7 +1,7 @@
 use crate::util::get_name_form_path;
+use chrono::{DateTime, Utc};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
-use time::{format_description, OffsetDateTime};
 
 pub type Params = BTreeMap<String, Option<String>>;
 pub type Headers = HashMap<String, String>;
@@ -98,7 +98,7 @@ pub enum ObjectType {
 #[derive(Clone, Debug, Default)]
 pub struct Object {
     key: String,
-    last_modified: Option<OffsetDateTime>,
+    last_modified: Option<DateTime<Utc>>,
     size: usize,
     etag: String,
     mine_type: String,
@@ -111,7 +111,7 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn new(key: &str, last_modified: Option<OffsetDateTime>, size: usize) -> Self {
+    pub fn new(key: &str, last_modified: Option<DateTime<Utc>>, size: usize) -> Self {
         Object {
             key: key.to_owned(),
             last_modified,
@@ -132,8 +132,8 @@ impl Object {
         &self.key
     }
 
-    pub fn last_modified(&self) -> OffsetDateTime {
-        self.last_modified.unwrap_or(OffsetDateTime::UNIX_EPOCH)
+    pub fn last_modified(&self) -> Option<DateTime<Utc>> {
+        self.last_modified
     }
 
     pub fn size(&self) -> usize {
@@ -182,12 +182,7 @@ impl Object {
 
     pub fn date_string(&self) -> String {
         match self.last_modified {
-            Some(date) => {
-                let format =
-                    format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
-                        .unwrap();
-                date.format(&format).unwrap()
-            }
+            Some(date) => date.format("%Y-%m-%d %H:%M:%S").to_string(),
             None => "_".into(),
         }
     }

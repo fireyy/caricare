@@ -8,7 +8,7 @@ pub enum ConfirmAction {
     RemoveFile(Object),
     CreateFolder(String),
     RemoveFiles,
-    GenerateUrl(i64),
+    GenerateUrl(u64),
     RenameObject((String, String)),
 }
 
@@ -98,7 +98,7 @@ impl Confirm {
                                             }
                                             ConfirmAction::GenerateUrl(_) => {
                                                 final_action = ConfirmAction::GenerateUrl(
-                                                    self.prompt.parse::<i64>().unwrap(),
+                                                    self.prompt.parse::<u64>().unwrap(),
                                                 );
                                             }
                                             ConfirmAction::RenameObject((src, _)) => {

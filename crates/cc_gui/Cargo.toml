@@ -21,3 +21,4 @@ egui-notify = "0.6"
 tracing = { workspace = true }
 cc_storage = { workspace = true }
 crossbeam-channel = { workspace = true }
+once_cell = { workspace = true }
