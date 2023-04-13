@@ -3,7 +3,7 @@ use cc_storage::Object;
 use egui::{self, RichText, Sense};
 
 pub fn item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
-    let response = egui::Frame {
+    egui::Frame {
         inner_margin: egui::style::Margin::same(5.0),
         outer_margin: egui::style::Margin::same(0.0),
         // fill: fill_color,
@@ -31,7 +31,5 @@ pub fn item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
         });
     })
     .response
-    .interact(Sense::click());
-
-    response
+    .interact(Sense::click())
 }

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 ///! A toast notification system for egui, roughly based on <https://github.com/urholaukkarinen/egui-toast>.
 use std::{collections::HashMap, fmt};
 
@@ -86,6 +87,22 @@ impl Toasts {
     pub fn error(&mut self, msg: impl Into<String>) {
         self.add(Toast {
             kind: ToastKind::Error,
+            text: msg.into(),
+            options: ToastOptions::with_ttl_in_seconds(4.0),
+        });
+    }
+
+    pub fn warn(&mut self, msg: impl Into<String>) {
+        self.add(Toast {
+            kind: ToastKind::Warning,
+            text: msg.into(),
+            options: ToastOptions::with_ttl_in_seconds(4.0),
+        });
+    }
+
+    pub fn info(&mut self, msg: impl Into<String>) {
+        self.add(Toast {
+            kind: ToastKind::Info,
             text: msg.into(),
             options: ToastOptions::with_ttl_in_seconds(4.0),
         });
