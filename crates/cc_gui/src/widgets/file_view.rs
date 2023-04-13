@@ -67,7 +67,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                 }
             });
             let mut is_image = false;
-            if let Some(file) = state.file_cache.check(state.current_object.url()) {
+            if let Some(file) = state.file_cache.check(state.current_object.key()) {
                 if file.is_image() {
                     is_image = true;
                     let mut size = file.size_vec2();
@@ -104,6 +104,12 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                             }
                         }
                     }
+                } else if file.is_unknown() {
+                    is_image = false;
+                    ui.centered_and_justified(|ui| {
+                        ui.set_height(win_size.y - 130.0);
+                        ui.heading("Couldn't Preview File");
+                    });
                 } else {
                     is_image = false;
                     egui::ScrollArea::both()

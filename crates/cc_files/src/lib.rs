@@ -45,6 +45,10 @@ impl FileType {
         matches!(self, Self::StaticImage(_) | Self::AnimatedImage(_))
     }
 
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+
     pub fn show(&self, ui: &mut egui::Ui) -> egui::Response {
         match self {
             Self::PlainText(data) => {
@@ -234,11 +238,16 @@ impl Cache {
     }
 
     pub fn add(&mut self, name: &str, data: Vec<u8>) {
-        tracing::debug!("Add image: {name}");
+        tracing::debug!("Add file: {name}");
         self.map.insert(name.to_string(), FileType::Unknown);
         if let Ok(file) = Loader::load(name, data) {
             self.map.insert(name.to_string(), file);
         }
+    }
+
+    pub fn big_file(&mut self, name: &str) {
+        tracing::debug!("Big file: {name}");
+        self.map.insert(name.to_string(), FileType::Unknown);
     }
 
     pub fn replace(&mut self, old_key: &str, new_key: &str) {

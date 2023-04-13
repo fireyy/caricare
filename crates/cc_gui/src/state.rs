@@ -14,6 +14,8 @@ use cc_storage::{
 // use egui_notify::Toasts;
 use std::{path::PathBuf, vec};
 
+const MAX_BUFFER_SIZE: u64 = 2 * 1024 * 1024;
+
 #[derive(PartialEq)]
 pub enum Status {
     Idle(Route),
@@ -272,11 +274,19 @@ impl State {
                 },
                 Update::HeadObject(result) => match result {
                     Ok(headers) => {
-                        tracing::debug!("current_img: {:?}", self.current_object);
+                        tracing::debug!(
+                            "current: {:?} {}",
+                            self.current_object,
+                            headers.content_length()
+                        );
                         if let Some(mint_type) = headers.content_type() {
                             self.current_object.set_mine_type(mint_type.to_string());
                         }
-                        self.get_current_object();
+                        if headers.content_length() <= MAX_BUFFER_SIZE {
+                            self.get_current_object();
+                        } else {
+                            self.file_cache.big_file(self.current_object.key());
+                        }
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -444,9 +454,6 @@ impl State {
     }
 
     pub fn get_current_object(&mut self) {
-        // self.status = Status::Busy(Route::List);
-
-        // let name = format!("{}{}", self.current_path, name);
         let name = self.current_object.key().to_string();
 
         spawn_evs!(self, |evs, client, ctx| {
