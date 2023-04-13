@@ -152,6 +152,7 @@ impl Client {
         Ok(())
     }
 
+    // TODO: The copy function is not compatible with OSS
     pub async fn copy_object(
         &self,
         src: impl AsRef<str>,
@@ -163,7 +164,7 @@ impl Client {
 
         tracing::debug!("Copy object: {} to: {}", src, dest);
 
-        // let _ = self.operator.copy().await?;
+        self.operator.copy(src, dest).await?;
 
         Ok((src.to_string(), is_move))
     }
@@ -285,16 +286,17 @@ impl Client {
         Ok(results)
     }
 
-    pub fn signature_url(
+    pub async fn signature_url(
         &self,
         object: &str,
-        expire: i64,
+        expire: u64,
         // TODO: join the params like: x-oss-image=
         _params: Option<Params>,
     ) -> Result<String> {
         let url = self
             .operator
-            .presign_read(object, time::Duration::seconds(expire))?;
+            .presign_read(object, std::time::Duration::from_secs(expire))
+            .await?;
 
         Ok(url.uri().to_string())
     }
