@@ -1,69 +1,68 @@
-on: [push, pull_request]
-
 name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "icons/**"
+      - "res/**"
+      - "*.md"
+      - ".github/**"
+      - "!.github/workflows/rust.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 
 jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: sudo apt-get install libgtk-3-dev
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --workspace --all-targets --all-features
+          cache-key: "-check"
+      - name: Cargo check
+        run: cargo check --workspace --all-targets
 
   test:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: sudo apt-get install libgtk-3-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --workspace --all-targets --all-features
+      - uses: actions/checkout@v3
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup
+      - name: Test
+        run: cargo test --workspace --all-targets --all-features
 
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+          cache-key: "-check"
+
+      - name: Cargo format
+        run: cargo fmt --all -- --check
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: clippy
-      - run: sudo apt-get install libgtk-3-dev
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --workspace --all-targets --all-features -- -D warnings -W clippy::all
+          cache-key: "-check"
+      - name: Cargo clippy
+        run: cargo clippy --workspace --all-targets --all-features --  -D warnings -W clippy::all
