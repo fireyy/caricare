@@ -93,14 +93,9 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
                                     |ui| {
                                         ui.checkbox(&mut data.selected, "");
                                         ui.vertical(|ui| {
-                                            ui.add(
-                                                egui::Label::new(
-                                                    state
-                                                        .cc_ui
-                                                        .text_ellipsis(data.name().as_ref(), 1),
-                                                )
-                                                .sense(egui::Sense::click()),
-                                            );
+                                            ui.add(egui::Label::new(
+                                                state.cc_ui.text_ellipsis(data.name().as_ref(), 1),
+                                            ));
                                         });
                                     },
                                 );

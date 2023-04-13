@@ -1,6 +1,6 @@
 use crate::theme::text_ellipsis;
 use cc_storage::Object;
-use egui::{self, vec2, Color32, RichText, Sense};
+use egui::{self, RichText, Sense};
 
 pub fn item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
     let response = egui::Frame {
