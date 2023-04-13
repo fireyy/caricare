@@ -1,17 +1,17 @@
-use crate::spawn_evs;
 use crate::theme;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
-    file_view_ui, log_panel_ui,
+    file_view_ui, log_panel_ui, transfer_panel_ui,
 };
+use crate::{spawn_evs, spawn_transfer};
 use cc_core::{log::LogItem, store, tracing, MemoryHistory, Session, Setting};
 use cc_files::Cache as ImageCache;
-use egui_notify::Toasts;
-use oss_sdk::util::get_name_form_path;
-use oss_sdk::{
-    Bucket, Client as OssClient, HeaderMap, ListObjects, Object, Params, Result as OssResult,
+use cc_storage::util::get_name_form_path;
+use cc_storage::{
+    Bucket, Client, ListObjects, Metadata, Object, Params, Result as ClientResult, TransferManager,
 };
-use std::{path::PathBuf, sync::mpsc, vec};
+use egui_notify::Toasts;
+use std::{path::PathBuf, vec};
 
 #[derive(PartialEq)]
 pub enum Status {
@@ -45,29 +45,27 @@ pub enum FileAction {
 }
 
 pub enum Update {
-    Uploaded(OssResult<Vec<String>>),
-    List(OssResult<ListObjects>),
+    TransferResult,
+    List(ClientResult<ListObjects>),
     Navgator(NavgatorType),
-    Deleted(OssResult<()>),
-    CreateFolder(OssResult<()>),
+    Deleted(ClientResult<()>),
+    CreateFolder(ClientResult<()>),
     ViewObject(Object),
-    HeadObject(OssResult<HeaderMap>),
-    GetObject(OssResult<(String, Vec<u8>)>),
-    BucketInfo(OssResult<Bucket>),
-    Copied(OssResult<(String, bool)>),
+    HeadObject(ClientResult<Metadata>),
+    GetObject(ClientResult<(String, Vec<u8>)>),
+    BucketInfo(ClientResult<Bucket>),
+    Copied(ClientResult<(String, bool)>),
     DownloadObject(String),
-    Success(String),
-    Error(String),
 }
 
 pub struct State {
-    pub oss: Option<OssClient>,
+    pub client: Option<Client>,
     pub list: Vec<Object>,
     pub current_object: Object,
     //TODO: use crossbeam or flume
-    pub update_tx: mpsc::SyncSender<Update>,
-    pub update_rx: mpsc::Receiver<Update>,
-    pub confirm_rx: mpsc::Receiver<ConfirmAction>,
+    pub update_tx: crossbeam_channel::Sender<Update>,
+    pub update_rx: crossbeam_channel::Receiver<Update>,
+    pub confirm_rx: crossbeam_channel::Receiver<ConfirmAction>,
     pub setting: Setting,
     pub is_preview: bool,
     pub img_zoom: f32,
@@ -94,6 +92,7 @@ pub struct State {
     pub ctx: egui::Context,
     pub bucket: Option<Bucket>,
     pub file_action: Option<FileAction>,
+    pub transfer_manager: TransferManager,
 }
 
 impl State {
@@ -104,11 +103,11 @@ impl State {
             None => Session::default(),
         };
 
-        let mut oss = None;
+        let mut client = None;
         let mut bucket = None;
 
-        let (update_tx, update_rx) = mpsc::sync_channel(1);
-        let (confirm_tx, confirm_rx) = mpsc::sync_channel(1);
+        let (update_tx, update_rx) = crossbeam_channel::unbounded();
+        let (confirm_tx, confirm_rx) = crossbeam_channel::bounded(1);
 
         let mut current_path = String::from("");
         let navigator = MemoryHistory::new();
@@ -120,18 +119,20 @@ impl State {
 
         let setting = Setting::load();
 
-        if !session.is_empty() && setting.auto_login {
-            match OssClient::builder()
+        let is_need_init = !session.is_empty() && setting.auto_login;
+
+        if is_need_init {
+            match Client::builder()
                 .endpoint(&session.endpoint)
                 .access_key(&session.key_id)
                 .access_secret(&session.key_secret)
                 .bucket(&session.bucket)
                 .build()
             {
-                Ok(client) => {
+                Ok(cli) => {
                     bucket = Some(Bucket::default());
                     current_path = "".to_string();
-                    oss = Some(client);
+                    client = Some(cli);
                     navigator.push(current_path.clone());
                 }
                 Err(err) => tracing::error!("{:?}", err),
@@ -142,7 +143,7 @@ impl State {
 
         let mut this = Self {
             setting,
-            oss,
+            client,
             current_object: Object::default(),
             list: vec![],
             update_tx,
@@ -173,11 +174,15 @@ impl State {
             ctx: ctx.clone(),
             bucket,
             file_action: None,
+            transfer_manager: TransferManager::new(),
         };
 
         this.next_query = Some(this.build_query(None));
         this.sessions = this.load_all_session();
-        this.get_bucket_info();
+
+        if is_need_init {
+            this.get_bucket_info();
+        }
 
         this
     }
@@ -185,23 +190,15 @@ impl State {
     pub fn init(&mut self, ctx: &egui::Context) {
         self.file_cache.poll();
         self.init_confirm(ctx);
+        let ctx_clone = ctx.clone();
+        self.transfer_manager
+            .poll(move || ctx_clone.request_repaint());
         self.selected_item = self.list.iter().filter(|x| x.selected).count();
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
-                Update::Uploaded(result) => match result {
-                    Ok(str) => {
-                        self.status = Status::Idle(Route::List);
-                        for s in str {
-                            self.logs.push(LogItem::upload().with_info(s));
-                        }
-                        self.refresh();
-                    }
-                    Err(err) => {
-                        self.status = Status::Idle(Route::Upload);
-                        self.logs
-                            .push(LogItem::upload().with_error(err.to_string()));
-                    }
-                },
+                Update::TransferResult => {
+                    self.refresh();
+                }
                 Update::List(result) => match result {
                     Ok(str) => {
                         if let Some(token) = str.next_continuation_token() {
@@ -278,9 +275,8 @@ impl State {
                             self.current_object.set_url(url);
                         }
                         tracing::debug!("current_img: {:?}", self.current_object);
-                        if let Some(mint_type) = headers.get("content-type") {
-                            self.current_object
-                                .set_mine_type(mint_type.to_str().unwrap().to_string());
+                        if let Some(mint_type) = headers.content_type() {
+                            self.current_object.set_mine_type(mint_type.to_string());
                         }
                         self.get_current_object();
                     }
@@ -315,12 +311,6 @@ impl State {
                 Update::DownloadObject(name) => {
                     self.download_file(name);
                 }
-                Update::Success(result) => {
-                    self.toasts.success(result);
-                }
-                Update::Error(result) => {
-                    self.toasts.error(result);
-                }
             }
         }
 
@@ -343,16 +333,17 @@ impl State {
             self.dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
         }
 
-        if self.oss.is_some() {
+        if self.client.is_some() {
             file_view_ui(ctx, self);
             log_panel_ui(ctx, self);
+            transfer_panel_ui(ctx, self);
         }
 
         self.toasts.show(ctx);
     }
 
-    pub fn oss(&self) -> &OssClient {
-        self.oss.as_ref().expect("Oss not initialized yet")
+    pub fn client(&self) -> &Client {
+        self.client.as_ref().expect("Oss not initialized yet")
     }
 
     pub fn bucket(&self) -> &Bucket {
@@ -363,11 +354,11 @@ impl State {
         self.bucket().is_private()
     }
 
-    pub fn get_signature_url(&self, name: &str, expire: i64) -> OssResult<String> {
+    pub fn get_signature_url(&self, name: &str, expire: i64) -> ClientResult<String> {
         if self.bucket_is_private() {
-            self.oss().signature_url(name, expire, None)
+            self.client().signature_url(name, expire, None)
         } else {
-            Ok(format!("{}/{name}", self.oss().get_bucket_url()))
+            Ok(format!("{}/{name}", self.client().get_bucket_url()))
         }
     }
 
@@ -378,11 +369,13 @@ impl State {
                 "x-oss-process".into(),
                 Some(format!("image/resize,w_{size}")),
             );
-            self.oss().signature_url(name, 3600, Some(params)).unwrap()
+            self.client()
+                .signature_url(name, 3600, Some(params))
+                .unwrap()
         } else {
             format!(
                 "{}/{name}?x-oss-process=image/resize,w_{size}",
-                self.oss().get_bucket_url(),
+                self.client().get_bucket_url(),
             )
         }
     }
@@ -393,13 +386,13 @@ impl State {
         }
         let picked_path = self.picked_path.clone();
         self.picked_path = vec![];
-        self.status = Status::Busy(Route::Upload);
 
         let dest = self.current_path.clone();
+        self.transfer_manager.show("upload");
 
-        spawn_evs!(self, |evs, client, ctx| {
-            let res = client.put_multi(picked_path, dest).await;
-            evs.send(Update::Uploaded(res)).unwrap();
+        spawn_transfer!(self, |transfer, evs, client, ctx| {
+            let _ = client.put_multi(picked_path, dest, transfer).await;
+            evs.send(Update::TransferResult).unwrap();
             ctx.request_repaint();
         });
     }
@@ -483,12 +476,12 @@ impl State {
     }
 
     pub fn get_list(&mut self) {
-        if let Some(query) = &self.next_query {
+        if let Some(_query) = &self.next_query {
             if !self.loading_more {
                 self.status = Status::Busy(Route::List);
             }
 
-            let query = query.clone();
+            let query = self.current_path.clone();
 
             spawn_evs!(self, |evs, client, ctx| {
                 let res = client.list_v2(Some(query)).await;
@@ -551,9 +544,9 @@ impl State {
         query
     }
 
-    pub fn login(&mut self) -> OssResult<()> {
+    pub fn login(&mut self) -> ClientResult<()> {
         tracing::debug!("Login with session: {:?}", self.session);
-        let client = OssClient::builder()
+        let client = Client::builder()
             .endpoint(&self.session.endpoint)
             .access_key(&self.session.key_id)
             .access_secret(&self.session.key_secret)
@@ -564,7 +557,7 @@ impl State {
         let current_path = "".to_string();
         self.current_path = current_path.clone();
         self.navigator.push(current_path);
-        self.oss = Some(client);
+        self.client = Some(client);
         self.get_bucket_info();
         self.refresh();
         self.setting.auto_login = true;
@@ -578,7 +571,7 @@ impl State {
             match action {
                 ConfirmAction::Logout => {
                     self.status = Status::Idle(Route::Auth);
-                    self.oss = None;
+                    self.client = None;
                     self.current_path = String::from("");
                     self.navigator.clear();
                     self.setting.auto_login = false;
@@ -628,21 +621,13 @@ impl State {
         sessions
     }
 
-    pub fn download_file(&self, name: String) {
+    pub fn download_file(&mut self, name: String) {
         let file_name = get_name_form_path(&name);
+        self.transfer_manager.show("download");
         if let Some(path) = rfd::FileDialog::new().set_file_name(&file_name).save_file() {
-            spawn_evs!(self, |evs, client, ctx| {
-                let res = client.get_object(name).await;
-                if let Ok((_name, data)) = res {
-                    match std::fs::write(path, data) {
-                        Ok(_) => evs
-                            .send(Update::Success("Download success.".into()))
-                            .unwrap(),
-                        Err(_) => evs.send(Update::Error("Download failed.".into())).unwrap(),
-                    }
-                } else {
-                    evs.send(Update::Error("Download failed.".into())).unwrap();
-                }
+            spawn_transfer!(self, |transfer, evs, client, ctx| {
+                let _ = client.download_file(&name, path, transfer).await;
+                evs.send(Update::TransferResult).unwrap();
                 ctx.request_repaint();
             });
         }

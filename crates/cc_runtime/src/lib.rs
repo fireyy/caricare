@@ -1,6 +1,7 @@
 use std::{collections::HashMap, future::Future};
 
 use once_cell::sync::OnceCell;
+pub use tokio;
 use tokio::sync::oneshot::{self, Receiver};
 
 static HANDLE: OnceCell<tokio::runtime::Handle> = OnceCell::new();

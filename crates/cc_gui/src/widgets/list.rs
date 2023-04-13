@@ -3,7 +3,7 @@ use crate::state::{NavgatorType, State, Update};
 use crate::theme::icon;
 use crate::widgets::confirm::ConfirmAction;
 use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
-use oss_sdk::ObjectType;
+use cc_storage::ObjectType;
 
 macro_rules! handle_click {
     ($state:ident, $data:ident) => {{

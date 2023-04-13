@@ -50,6 +50,11 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                 } else {
                     n_color
                 };
+                let transfer_color = if state.transfer_manager.is_show {
+                    style.hyperlink_color
+                } else {
+                    n_color
+                };
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                     if ui
@@ -67,6 +72,25 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                         .clicked()
                     {
                         state.is_show_result = !state.is_show_result;
+                    }
+                    // transfer toggle
+                    if ui
+                        .button(
+                            egui::RichText::new(format!(
+                                "{} {}/{} , {} {}/{}",
+                                icon::DOWNLOAD,
+                                0,
+                                0,
+                                icon::UPLOAD,
+                                0,
+                                0
+                            ))
+                            .color(transfer_color),
+                        )
+                        .on_hover_text("Transfer")
+                        .clicked()
+                    {
+                        state.transfer_manager.is_show = !state.transfer_manager.is_show;
                     }
                 });
             });

@@ -8,6 +8,7 @@ mod log_panel;
 mod password;
 mod status_bar;
 mod top_bar;
+mod transfer_panel;
 
 // pub use action_bar::action_bar_ui;
 pub use file_view::file_view_ui;
@@ -17,3 +18,4 @@ pub use log_panel::log_panel_ui;
 pub use password::password;
 pub use status_bar::status_bar_ui;
 pub use top_bar::top_bar_ui;
+pub use transfer_panel::transfer_panel_ui;

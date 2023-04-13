@@ -11,7 +11,6 @@ use anyhow::Context as _;
 use egui::Vec2;
 use egui_extras::RetainedImage;
 use image::ImageFormat;
-use tokio_stream::StreamExt as _;
 
 pub enum FileType {
     StaticImage(RetainedImage),
@@ -251,21 +250,21 @@ impl Cache {
 
 #[derive(Clone)]
 struct Loader {
-    submit: flume::Sender<String>,
-    produce: flume::Receiver<(String, FileType)>,
+    submit: crossbeam_channel::Sender<String>,
+    produce: crossbeam_channel::Receiver<(String, FileType)>,
 }
 
 impl Loader {
     fn spawn(repaint: impl Fn() + Clone + Send + Sync + 'static) -> Self {
-        let (submit, submit_rx) = flume::unbounded::<String>();
-        let (produce_tx, produce) = flume::unbounded();
+        let (submit, submit_rx) = crossbeam_channel::unbounded::<String>();
+        let (produce_tx, produce) = crossbeam_channel::unbounded();
 
         cc_runtime::spawn(async move {
             let mut seen = HashSet::new();
-            let mut stream = submit_rx.into_stream();
+            // let mut stream = submit_rx.into_stream();
             let client = reqwest::Client::new();
 
-            while let Some(url) = stream.next().await {
+            while let Ok(url) = submit_rx.try_recv() {
                 if !seen.insert(url.clone()) {
                     continue;
                 }

@@ -11,7 +11,7 @@ pub use session::Session;
 pub use setting::{Setting, ShowType};
 pub use tracing;
 
-const LOG_LEVEL: &str = "info";
+const LOG_LEVEL: &str = "debug";
 
 pub fn init_core() {
     let mut rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| LOG_LEVEL.to_owned());

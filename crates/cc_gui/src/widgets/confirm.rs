@@ -1,5 +1,5 @@
 use cc_core::Session;
-use oss_sdk::Object;
+use cc_storage::Object;
 
 #[derive(Clone)]
 pub enum ConfirmAction {
@@ -24,12 +24,12 @@ pub struct Confirm {
     message: String,
     c_type: ConfirmType,
     prompt: String,
-    tx: std::sync::mpsc::SyncSender<ConfirmAction>,
+    tx: crossbeam_channel::Sender<ConfirmAction>,
     action: Option<ConfirmAction>,
 }
 
 impl Confirm {
-    pub fn new(tx: std::sync::mpsc::SyncSender<ConfirmAction>) -> Self {
+    pub fn new(tx: crossbeam_channel::Sender<ConfirmAction>) -> Self {
         Self {
             is_show: false,
             title: "Confirm".into(),
