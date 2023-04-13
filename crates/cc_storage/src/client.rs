@@ -82,6 +82,13 @@ impl Client {
         Ok((object.to_string(), result))
     }
 
+    pub async fn get_object_range(&self, object: impl AsRef<str>) -> Result<(String, Vec<u8>)> {
+        let object = object.as_ref();
+        let result = self.operator.range_read(object, ..128).await?;
+
+        Ok((object.to_string(), result))
+    }
+
     pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<()> {
         let object = object.as_ref();
         self.operator.delete(object).await?;
