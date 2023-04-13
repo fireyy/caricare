@@ -25,6 +25,8 @@ runs:
       run: |
         # Update rust to latest stable
         rustup update stable
+        # Install system dependencies 
+        sudo apt-get install libgtk-3-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
         # Disable full debug symbol generation to speed up CI build and keep memory down
         # "1" means line tables only, which is useful for panic tracebacks.
         echo "RUSTFLAGS=-C debuginfo=1" >> $GITHUB_ENV
