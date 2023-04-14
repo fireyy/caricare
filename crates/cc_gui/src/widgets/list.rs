@@ -116,11 +116,10 @@ pub fn thumb_ui(
     ui: &mut egui::Ui,
     row_range: std::ops::Range<usize>,
     num_cols: usize,
-    col_width: f32,
 ) {
     egui::Grid::new("grid".to_string())
         .num_columns(num_cols)
-        .max_col_width(col_width - 9.0)
+        .max_col_width(THUMB_LIST_WIDTH - 9.0)
         .min_col_width(THUMB_LIST_WIDTH - 9.0)
         .min_row_height(THUMB_LIST_HEIGHT)
         .spacing(egui::Vec2::new(9.0, 0.0))

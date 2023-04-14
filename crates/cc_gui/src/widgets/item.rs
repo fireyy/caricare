@@ -3,10 +3,15 @@ use cc_storage::Object;
 use egui::{self, RichText, Sense};
 
 pub fn item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
+    let fill_color = if data.selected {
+        egui::Color32::from_gray(60)
+    } else {
+        egui::Color32::from_gray(20)
+    };
     egui::Frame {
         inner_margin: egui::style::Margin::same(5.0),
         outer_margin: egui::style::Margin::same(0.0),
-        // fill: fill_color,
+        fill: fill_color,
         ..egui::Frame::default()
     }
     .show(ui, |ui| {
