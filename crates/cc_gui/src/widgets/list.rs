@@ -129,10 +129,12 @@ pub fn thumb_ui(
                 for j in 0..num_cols {
                     if let Some(d) = state.list.get_mut(j + i * num_cols) {
                         let data = d.clone();
-                        let response = item_ui(ui, d);
-                        if response.on_hover_text(d.name()).clicked() {
-                            handle_click!(state, data);
-                        }
+                        egui::Frame::none().show(ui, |ui| {
+                            let response = item_ui(ui, d, &state.cc_ui);
+                            if response.on_hover_text(d.name()).clicked() {
+                                handle_click!(state, data);
+                            }
+                        });
                     }
                 }
                 ui.end_row();
