@@ -1,10 +1,11 @@
+use crate::global;
 use crate::state::State;
 use crate::theme::icon;
 
 pub fn transfer_panel_ui(ctx: &egui::Context, state: &mut State) {
     let frame = egui::Frame {
         fill: ctx.style().visuals.panel_fill,
-        ..state.cc_ui.bottom_panel_frame()
+        ..global().cc_ui.bottom_panel_frame()
     };
     egui::TopBottomPanel::bottom("transfer_panel")
         .default_height(100.0)
@@ -78,7 +79,9 @@ pub fn transfer_panel_ui(ctx: &egui::Context, state: &mut State) {
                                                         ui.set_width(120.);
                                                         ui.vertical(|ui| {
                                                             ui.add(egui::Label::new(
-                                                                state.cc_ui.text_ellipsis(d.0, 1),
+                                                                global()
+                                                                    .cc_ui
+                                                                    .text_ellipsis(d.0, 1),
                                                             ))
                                                             .on_hover_text(d.0);
                                                         });

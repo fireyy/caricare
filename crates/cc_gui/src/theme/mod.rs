@@ -15,7 +15,7 @@ pub struct TopBarStyle {
     pub indent: f32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CCUi {
     pub egui_ctx: egui::Context,
     pub design_tokens: DesignTokens,

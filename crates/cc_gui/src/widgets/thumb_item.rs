@@ -1,9 +1,10 @@
-use crate::theme::{text_ellipsis, CCUi};
+use crate::global;
+use crate::theme::text_ellipsis;
 use crate::THUMB_LIST_HEIGHT;
 use cc_storage::Object;
 use egui::{self, vec2, RichText, Sense, WidgetInfo, WidgetType};
 
-pub fn item_ui(ui: &mut egui::Ui, data: &mut Object, cc_ui: &CCUi) -> egui::Response {
+pub fn thumb_item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
     let initial_size = vec2(
         ui.available_width(),
         THUMB_LIST_HEIGHT, // Assume there will be
@@ -16,10 +17,10 @@ pub fn item_ui(ui: &mut egui::Ui, data: &mut Object, cc_ui: &CCUi) -> egui::Resp
         let mut fill_color = if response.hovered() {
             visuals.bg_fill
         } else {
-            cc_ui.design_tokens.bottom_bar_color
+            global().cc_ui.design_tokens.bottom_bar_color
         };
         if data.selected {
-            fill_color = cc_ui.design_tokens.selection_color;
+            fill_color = global().cc_ui.design_tokens.selection_color;
         }
         ui.allocate_ui_at_rect(rect, |ui| {
             egui::Frame {

@@ -1,3 +1,4 @@
+use crate::globals::Globals;
 use crate::pages::{auth_page, main_page};
 use crate::state::{Route, State, Status};
 
@@ -7,6 +8,7 @@ pub struct App {
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        Globals::new(&cc.egui_ctx);
         let state = State::new(&cc.egui_ctx);
         let mut this = Self { state };
 

@@ -1,4 +1,4 @@
-use crate::theme;
+use crate::global;
 use crate::widgets::toasts::Toasts;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
@@ -11,7 +11,6 @@ use cc_storage::util::get_name_form_path;
 use cc_storage::{
     Bucket, Client, ListObjects, Metadata, Object, Params, Result as ClientResult, TransferManager,
 };
-// use egui_notify::Toasts;
 use std::{path::PathBuf, vec};
 
 const MAX_BUFFER_SIZE: u64 = 2 * 1024 * 1024;
@@ -60,14 +59,14 @@ pub enum Update {
     Copied(ClientResult<(String, bool)>),
     DownloadObject(String),
     SignatureUrl(ClientResult<String>),
+    Confirm((String, ConfirmAction)),
+    Prompt((String, ConfirmAction)),
 }
 
 pub struct State {
     pub client: Option<Client>,
     pub list: Vec<Object>,
     pub current_object: Object,
-    pub update_tx: crossbeam_channel::Sender<Update>,
-    pub update_rx: crossbeam_channel::Receiver<Update>,
     pub confirm_rx: crossbeam_channel::Receiver<ConfirmAction>,
     pub setting: Setting,
     pub is_preview: bool,
@@ -89,7 +88,6 @@ pub struct State {
     pub picked_path: Vec<PathBuf>,
     pub status: Status,
     pub toasts: Toasts,
-    pub cc_ui: theme::CCUi,
     pub filter_str: String,
     pub selected_item: usize,
     pub ctx: egui::Context,
@@ -100,7 +98,6 @@ pub struct State {
 
 impl State {
     pub fn new(ctx: &egui::Context) -> Self {
-        let cc_ui = theme::CCUi::load_and_apply(ctx);
         let session = match store::get_latest_session() {
             Some(session) => session,
             None => Session::default(),
@@ -109,7 +106,6 @@ impl State {
         let mut client = None;
         let mut bucket = None;
 
-        let (update_tx, update_rx) = crossbeam_channel::unbounded();
         let (confirm_tx, confirm_rx) = crossbeam_channel::bounded(1);
 
         let mut current_path = String::from("");
@@ -149,8 +145,6 @@ impl State {
             client,
             current_object: Object::default(),
             list: vec![],
-            update_tx,
-            update_rx,
             confirm_rx,
             err: None,
             is_preview: false,
@@ -171,7 +165,6 @@ impl State {
             picked_path: vec![],
             status,
             toasts: Toasts::new(),
-            cc_ui,
             filter_str: String::new(),
             selected_item: 0,
             ctx: ctx.clone(),
@@ -197,7 +190,7 @@ impl State {
         self.transfer_manager
             .poll(move || ctx_clone.request_repaint());
         self.selected_item = self.list.iter().filter(|x| x.selected).count();
-        while let Ok(update) = self.update_rx.try_recv() {
+        while let Ok(update) = global().update_rx.try_recv() {
             match update {
                 Update::TransferResult => {
                     self.refresh();
@@ -328,6 +321,8 @@ impl State {
                         self.logs.push(LogItem::copy().with_error(err.to_string()));
                     }
                 },
+                Update::Prompt((message, action)) => self.confirm.prompt(message, action),
+                Update::Confirm((message, action)) => self.confirm.show(message, action),
             }
         }
 
@@ -357,6 +352,10 @@ impl State {
         }
 
         self.toasts.show(ctx);
+    }
+
+    pub fn update_tx(&self) -> crossbeam_channel::Sender<Update> {
+        global().update_tx.clone()
     }
 
     pub fn client(&self) -> &Client {

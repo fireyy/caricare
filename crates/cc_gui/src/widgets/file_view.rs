@@ -2,6 +2,7 @@ use crate::state::State;
 use egui::Vec2;
 
 use super::confirm::ConfirmAction;
+use crate::global;
 use crate::theme::icon;
 
 #[derive(PartialEq)]
@@ -49,7 +50,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
     let win_size = ctx.input(|i| i.screen_rect).size();
     let frame = egui::Frame {
         fill: ctx.style().visuals.panel_fill,
-        ..state.cc_ui.bottom_panel_frame()
+        ..global().cc_ui.bottom_panel_frame()
     };
     egui::SidePanel::right("preview_panel")
         // .min_width(200.0)
@@ -104,12 +105,6 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                             }
                         }
                     }
-                } else if file.is_unknown() {
-                    is_image = false;
-                    ui.centered_and_justified(|ui| {
-                        ui.set_height(win_size.y - 130.0);
-                        ui.heading("Couldn't Preview File");
-                    });
                 } else {
                     is_image = false;
                     egui::ScrollArea::both()

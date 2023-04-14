@@ -1,5 +1,6 @@
 use super::confirm::ConfirmAction;
 use super::location_bar_ui;
+use crate::global;
 use crate::state::{FileAction, NavgatorType, Route, State, Status, Update};
 use crate::theme::icon;
 use cc_core::ShowType;
@@ -8,12 +9,12 @@ use cc_storage::util::get_name_form_path;
 pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {
     let native_pixels_per_point = frame.info().native_pixels_per_point;
     let fullscreen = frame.info().window_info.fullscreen;
-    let top_bar_style = state
+    let top_bar_style = global()
         .cc_ui
         .top_bar_style(native_pixels_per_point, fullscreen);
 
     egui::TopBottomPanel::top("top_bar")
-        .frame(state.cc_ui.top_panel_frame())
+        .frame(global().cc_ui.top_panel_frame())
         .exact_height(top_bar_style.height)
         .show(ctx, |ui| {
             egui::Frame::none()
@@ -24,7 +25,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         // Go to Back button
                         ui.add_enabled_ui(state.navigator.can_go_back(), |ui| {
                             if ui.button(icon::BACK).on_hover_text("Back").clicked() {
-                                state
+                                global()
                                     .update_tx
                                     .send(Update::Navgator(NavgatorType::Back))
                                     .unwrap();
@@ -42,7 +43,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                     current.truncate(index);
                                     parent = current;
                                 }
-                                state
+                                global()
                                     .update_tx
                                     .send(Update::Navgator(NavgatorType::New(parent)))
                                     .unwrap();
@@ -51,7 +52,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         // Go Forward button
                         ui.add_enabled_ui(state.navigator.can_go_forward(), |ui| {
                             if ui.button(icon::FORWARD).on_hover_text("Forward").clicked() {
-                                state
+                                global()
                                     .update_tx
                                     .send(Update::Navgator(NavgatorType::Forward))
                                     .unwrap();
@@ -60,7 +61,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                         // Go to Home button
                         ui.add_enabled_ui(!state.navigator.location().is_empty(), |ui| {
                             if ui.button(icon::HOME).on_hover_text("Home").clicked() {
-                                state
+                                global()
                                     .update_tx
                                     .send(Update::Navgator(NavgatorType::New("".into())))
                                     .unwrap();
@@ -191,7 +192,7 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                 if ui
                                     .add(
                                         egui::Button::new(text)
-                                            .fill(state.cc_ui.design_tokens.selection_color),
+                                            .fill(global().cc_ui.design_tokens.selection_color),
                                     )
                                     .on_hover_text("Paste to current directory")
                                     .clicked()
