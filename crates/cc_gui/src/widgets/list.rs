@@ -12,7 +12,7 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
             for data in state.list[row_range].iter_mut() {
                 let response = list_item_ui(ui, data);
                 if response.on_hover_text(data.name()).clicked() {
-                    handle_click(&data);
+                    handle_click(data);
                 }
                 ui.end_row();
             }
@@ -35,11 +35,11 @@ pub fn thumb_ui(
         .show(ui, |ui| {
             for i in row_range {
                 for j in 0..num_cols {
-                    if let Some(d) = state.list.get_mut(j + i * num_cols) {
+                    if let Some(data) = state.list.get_mut(j + i * num_cols) {
                         egui::Frame::none().show(ui, |ui| {
-                            let response = thumb_item_ui(ui, d);
-                            if response.on_hover_text(d.name()).clicked() {
-                                handle_click(&d);
+                            let response = thumb_item_ui(ui, data);
+                            if response.on_hover_text(data.name()).clicked() {
+                                handle_click(data);
                             }
                         });
                     }

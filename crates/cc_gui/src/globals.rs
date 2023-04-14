@@ -13,7 +13,7 @@ pub struct Globals {
 static INSTANCE: OnceCell<Globals> = OnceCell::new();
 
 impl Globals {
-    pub fn new(ctx: &egui::Context) {
+    pub fn new(ctx: &egui::Context) -> &'static Globals {
         let cc_ui = theme::CCUi::load_and_apply(ctx);
         let (update_tx, update_rx) = crossbeam_channel::unbounded();
         let globals = Self {
@@ -21,7 +21,7 @@ impl Globals {
             update_tx,
             update_rx,
         };
-        INSTANCE.set(globals).unwrap();
+        INSTANCE.get_or_init(|| globals)
     }
 }
 
