@@ -1,22 +1,24 @@
 // mod action_bar;
 pub mod confirm;
 mod file_view;
-mod item;
 pub mod list;
+mod list_item;
 mod location_bar;
 mod log_panel;
 mod password;
 mod status_bar;
+mod thumb_item;
 pub mod toasts;
 mod top_bar;
 mod transfer_panel;
 
 // pub use action_bar::action_bar_ui;
 pub use file_view::file_view_ui;
-pub use item::item_ui;
+pub use list_item::list_item_ui;
 pub use location_bar::location_bar_ui;
 pub use log_panel::log_panel_ui;
 pub use password::password;
 pub use status_bar::status_bar_ui;
+pub use thumb_item::thumb_item_ui;
 pub use top_bar::top_bar_ui;
 pub use transfer_panel::transfer_panel_ui;

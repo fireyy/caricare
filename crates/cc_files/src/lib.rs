@@ -55,10 +55,13 @@ impl FileType {
                 if let Ok(text) = std::str::from_utf8(data) {
                     syntax_highlighting::code_view_ui(ui, text)
                 } else {
-                    ui.label("Parse error")
+                    ui.heading("Couldn't Preview File")
                 }
             }
-            _ => ui.centered_and_justified(|ui| ui.label("Unknown")).inner,
+            _ => {
+                ui.centered_and_justified(|ui| ui.heading("Couldn't Preview File"))
+                    .inner
+            }
         }
     }
 
@@ -82,14 +85,7 @@ impl FileType {
                 }
                 ui.allocate_response(size, egui::Sense::hover().union(egui::Sense::click()))
             }
-            Self::PlainText(data) => {
-                if let Ok(text) = std::str::from_utf8(data) {
-                    syntax_highlighting::code_view_ui(ui, text)
-                } else {
-                    ui.label("Parse error")
-                }
-            }
-            _ => ui.label("Unknown"),
+            _ => ui.heading("Couldn't Preview File"),
         }
     }
 
@@ -270,7 +266,6 @@ impl Loader {
 
         cc_runtime::spawn(async move {
             let mut seen = HashSet::new();
-            // let mut stream = submit_rx.into_stream();
             let client = reqwest::Client::new();
 
             while let Ok(url) = submit_rx.try_recv() {

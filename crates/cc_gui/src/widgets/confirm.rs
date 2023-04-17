@@ -1,7 +1,7 @@
 use cc_core::Session;
 use cc_storage::Object;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ConfirmAction {
     Logout,
     RemoveSession(Session),
@@ -12,12 +12,13 @@ pub enum ConfirmAction {
     RenameObject((String, String)),
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ConfirmType {
     Message,
     Prompt,
 }
 
+#[derive(Clone, Debug)]
 pub struct Confirm {
     is_show: bool,
     title: String,

@@ -1,9 +1,10 @@
+use crate::global;
 use crate::state::State;
 
 pub fn log_panel_ui(ctx: &egui::Context, state: &mut State) {
     let frame = egui::Frame {
         fill: ctx.style().visuals.panel_fill,
-        ..state.cc_ui.bottom_panel_frame()
+        ..global().cc_ui.bottom_panel_frame()
     };
     egui::TopBottomPanel::bottom("result_panel")
         .default_height(100.0)

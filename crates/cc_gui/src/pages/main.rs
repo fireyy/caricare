@@ -28,20 +28,14 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
                     ui.centered_and_justified(|ui| ui.heading("Nothing Here."));
                     return;
                 }
-                let (num_cols, num_rows, col_width, row_height) = match state.setting.show_type {
-                    ShowType::List => (
-                        1,
-                        list_len,
-                        1.0,
-                        ui.text_style_height(&egui::TextStyle::Body),
-                    ),
+                let (num_cols, num_rows, row_height) = match state.setting.show_type {
+                    ShowType::List => (1, list_len, ui.text_style_height(&egui::TextStyle::Body)),
                     ShowType::Thumb => {
-                        let w = ui.ctx().input(|i| i.screen_rect().size());
+                        let w = ui.available_size();
                         let num_cols = (w.x / THUMB_LIST_WIDTH) as usize;
                         let num_rows = (list_len as f32 / num_cols as f32).ceil() as usize;
-                        let col_width = w.x / (num_cols as f32);
 
-                        (num_cols, num_rows, col_width, THUMB_LIST_HEIGHT)
+                        (num_cols, num_rows, THUMB_LIST_HEIGHT)
                     }
                 };
 
@@ -58,7 +52,6 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
                     scroller = scroller.scroll_offset(egui::Vec2::ZERO);
                 }
 
-                // let response = scroller.show_rows(ui, row_height, num_rows, |ui, row_range| {
                 let spacing = ui.spacing().item_spacing;
                 let row_height_with_spacing = row_height + spacing.y;
                 let (current_scroll, max_scroll) = scroller
@@ -88,13 +81,9 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
                             viewport_ui.skip_ahead_auto_ids(min_row); // Make sure we get consistent IDs.
                             match state.setting.show_type {
                                 ShowType::List => list_ui(state, viewport_ui, min_row..max_row),
-                                ShowType::Thumb => thumb_ui(
-                                    state,
-                                    viewport_ui,
-                                    min_row..max_row,
-                                    num_cols,
-                                    col_width,
-                                ),
+                                ShowType::Thumb => {
+                                    thumb_ui(state, viewport_ui, min_row..max_row, num_cols)
+                                }
                             };
                         });
 

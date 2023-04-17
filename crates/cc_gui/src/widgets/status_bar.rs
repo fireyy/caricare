@@ -1,10 +1,11 @@
 use super::confirm::ConfirmAction;
+use crate::global;
 use crate::state::{Route, State, Status};
 use crate::theme::icon;
 
 pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe::Frame) {
     let frame = egui::Frame {
-        fill: state.cc_ui.design_tokens.bottom_bar_color,
+        fill: global().cc_ui.design_tokens.bottom_bar_color,
         inner_margin: egui::Vec2::new(10.0, 3.0).into(),
         ..Default::default()
     };
