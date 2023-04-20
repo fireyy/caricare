@@ -5,6 +5,19 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["services-s3-compatible"]
+# Enable Amazon Simple Storage Service support
+services-s3 = ["opendal/s3"]
+# Enable Aliyun Object Storage Service support
+services-oss = ["opendal/oss"]
+# Enable Google Cloud Storage support
+services-gcs = ["opendal/gcs"]
+# Enable Azure Blob Storage support
+services-azblob = ["opendal/azblob"]
+# Enable S3-Compatible Object Storage support
+services-s3-compatible = ["opendal/s3"]
+
 [dependencies]
 thiserror = "1.0"
 anyhow = "1.0"
