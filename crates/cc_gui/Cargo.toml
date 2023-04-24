@@ -6,6 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+default = ["services-s3-compatible"]
+# Enable Amazon Simple Storage Service support
+services-s3 = ["cc_storage/services-s3"]
+# Enable Aliyun Object Storage Service support
+services-oss = ["cc_storage/services-oss"]
+# Enable Google Cloud Storage support
+services-gcs = ["cc_storage/services-gcs"]
+# Enable Azure Blob Storage support
+services-azblob = ["cc_storage/services-azblob"]
+# Enable S3-Compatible Object Storage support
+services-s3-compatible = ["cc_storage/services-s3-compatible"]
 lang-cjk = []
 
 [dependencies]

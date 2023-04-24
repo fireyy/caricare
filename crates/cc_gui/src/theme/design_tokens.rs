@@ -1,3 +1,4 @@
+//! Adapted from https://github.com/rerun-io/rerun/blob/main/crates/re_ui/src/design_tokens.rs
 use egui::Color32;
 
 /// The look and feel of the UI.
@@ -42,35 +43,39 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
                 },
             ),
         );
+
+        font_definitions
+            .families
+            .get_mut(&egui::FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "Inter-Medium".into());
+
         // chinese font
         if cfg!(feature = "lang-cjk") {
             font_definitions.font_data.insert(
                 "SourceHan-Medium".into(),
                 egui::FontData::from_static(include_bytes!("../data/SourceHanSansCN-Medium.otf")),
             );
-        }
-        font_definitions
-            .families
-            .get_mut(&egui::FontFamily::Proportional)
-            .unwrap()
-            .insert(0, "Inter-Medium".into());
-        if cfg!(feature = "lang-cjk") {
+
             font_definitions
                 .families
                 .get_mut(&egui::FontFamily::Proportional)
                 .unwrap()
                 .insert(1, "SourceHan-Medium".into());
+
             font_definitions
                 .families
                 .get_mut(&egui::FontFamily::Monospace)
                 .unwrap()
                 .push("SourceHan-Medium".into());
         }
+
         font_definitions
             .families
             .get_mut(&egui::FontFamily::Proportional)
             .unwrap()
             .insert(2, "Icon".into());
+
         ctx.set_fonts(font_definitions);
     }
 
