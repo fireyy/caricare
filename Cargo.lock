@@ -35,7 +35,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cee8cf1202a4f94d31837f1902ab0a75c77b65bf59719e093703abe83efd74ec"
 dependencies = [
  "accesskit",
- "parking_lot 0.12.1",
+ "parking_lot",
 ]
 
 [[package]]
@@ -48,7 +48,7 @@ dependencies = [
  "accesskit_consumer",
  "objc2",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot",
 ]
 
 [[package]]
@@ -62,7 +62,7 @@ dependencies = [
  "async-channel",
  "atspi",
  "futures-lite",
- "parking_lot 0.12.1",
+ "parking_lot",
  "serde",
  "zbus",
 ]
@@ -77,7 +77,7 @@ dependencies = [
  "accesskit_consumer",
  "arrayvec",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot",
  "paste",
  "windows 0.42.0",
 ]
@@ -92,7 +92,7 @@ dependencies = [
  "accesskit_macos",
  "accesskit_unix",
  "accesskit_windows",
- "parking_lot 0.12.1",
+ "parking_lot",
  "winit",
 ]
 
@@ -186,7 +186,7 @@ dependencies = [
  "objc-foundation",
  "objc_id",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot",
  "thiserror",
  "winapi",
  "x11rb",
@@ -212,7 +212,7 @@ checksum = "1b19760fa2b7301cf235360ffd6d3558b1ed4249edd16d6cca8d690cee265b95"
 dependencies = [
  "event-listener",
  "futures-core",
- "parking_lot 0.12.1",
+ "parking_lot",
 ]
 
 [[package]]
@@ -777,19 +777,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam-epoch"
-version = "0.9.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46bd5f3f85273295a9d14aedfb86f6aadbff6d8f5295c4a9edb08e819dcf5695"
-dependencies = [
- "autocfg",
- "cfg-if",
- "crossbeam-utils",
- "memoffset 0.8.0",
- "scopeguard",
-]
-
-[[package]]
 name = "crossbeam-utils"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1118,7 +1105,7 @@ dependencies = [
  "bytemuck",
  "egui",
  "glow",
- "memoffset 0.6.5",
+ "memoffset",
  "tracing",
  "wasm-bindgen",
  "web-sys",
@@ -1209,7 +1196,7 @@ dependencies = [
  "ecolor",
  "emath",
  "nohash-hasher",
- "parking_lot 0.12.1",
+ "parking_lot",
  "serde",
 ]
 
@@ -1288,16 +1275,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9c384f161156f5260c24a097c56119f9be8c798586aecc13afbcbe7b7e26bf8"
 dependencies = [
  "percent-encoding",
-]
-
-[[package]]
-name = "fs2"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]
@@ -1402,15 +1379,6 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "slab",
-]
-
-[[package]]
-name = "fxhash"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
-dependencies = [
- "byteorder",
 ]
 
 [[package]]
@@ -2025,15 +1993,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "memoffset"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2123,7 +2082,7 @@ dependencies = [
  "bitflags",
  "cfg-if",
  "libc",
- "memoffset 0.6.5",
+ "memoffset",
 ]
 
 [[package]]
@@ -2136,7 +2095,7 @@ dependencies = [
  "bitflags",
  "cfg-if",
  "libc",
- "memoffset 0.6.5",
+ "memoffset",
  "pin-utils",
 ]
 
@@ -2330,9 +2289,9 @@ checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "opendal"
-version = "0.31.0"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf96af8fd158be23ee9c3a6adb3383a665424cc50b0c68774fe6d1a18892077f"
+checksum = "e5400b31f85d6fb0d835f696be302d0582f84886859361ca241178b8c6af834f"
 dependencies = [
  "anyhow",
  "async-compat",
@@ -2348,7 +2307,7 @@ dependencies = [
  "log",
  "md-5",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot",
  "percent-encoding",
  "pin-project",
  "quick-xml 0.27.1",
@@ -2356,7 +2315,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "sled",
  "tokio",
  "uuid",
 ]
@@ -2434,37 +2392,12 @@ checksum = "427c3892f9e783d91cc128285287e70a59e206ca452770ece88a76f7a3eddd72"
 
 [[package]]
 name = "parking_lot"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d17b78036a60663b797adeaee46f5c9dfebb86948d1255007a1d6be0271ff99"
-dependencies = [
- "instant",
- "lock_api",
- "parking_lot_core 0.8.6",
-]
-
-[[package]]
-name = "parking_lot"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
 dependencies = [
  "lock_api",
- "parking_lot_core 0.9.4",
-]
-
-[[package]]
-name = "parking_lot_core"
-version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60a2cfe6f0ad2bfc16aefa463b497d5c7a5ecd44a23efa72aa342d90177356dc"
-dependencies = [
- "cfg-if",
- "instant",
- "libc",
- "redox_syscall 0.2.16",
- "smallvec",
- "winapi",
+ "parking_lot_core",
 ]
 
 [[package]]
@@ -3206,22 +3139,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4614a76b2a8be0058caa9dbbaf66d988527d86d003c11a94fbd335d7661edcef"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "sled"
-version = "0.34.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f96b4737c2ce5987354855aed3797279def4ebf734436c6aa4552cf8e169935"
-dependencies = [
- "crc32fast",
- "crossbeam-epoch",
- "crossbeam-utils",
- "fs2",
- "fxhash",
- "libc",
- "log",
- "parking_lot 0.11.2",
 ]
 
 [[package]]

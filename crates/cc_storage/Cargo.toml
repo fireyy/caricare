@@ -8,15 +8,15 @@ edition = "2021"
 [features]
 default = ["services-s3-compatible"]
 # Enable Amazon Simple Storage Service support
-services-s3 = ["opendal/s3"]
+services-s3 = ["opendal/services-s3"]
 # Enable Aliyun Object Storage Service support
-services-oss = ["opendal/oss"]
+services-oss = ["opendal/services-oss"]
 # Enable Google Cloud Storage support
-services-gcs = ["opendal/gcs"]
+services-gcs = ["opendal/services-gcs"]
 # Enable Azure Blob Storage support
-services-azblob = ["opendal/azblob"]
+services-azblob = ["opendal/services-azblob"]
 # Enable S3-Compatible Object Storage support
-services-s3-compatible = ["opendal/s3"]
+services-s3-compatible = ["services-s3"]
 
 [dependencies]
 thiserror = "1.0"
@@ -24,7 +24,7 @@ anyhow = "1.0"
 tracing = { workspace = true }
 bytesize = "1.1.0"
 chrono = "0.4.24"
-opendal = "0.31.0"
+opendal = "0.33.0"
 futures = "0.3"
 bytes = "^1"
 tokio = { version = "^1.0", features = ["fs", "io-util", "sync"] }
