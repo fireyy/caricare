@@ -1,8 +1,8 @@
 use crate::global;
 use crate::state::Update;
-use crate::theme::icon;
 use crate::widgets::confirm::ConfirmAction;
 use cc_storage::Object;
+use cc_ui::icon;
 use egui::{self, style::Margin, vec2, Color32, Frame, Sense, WidgetInfo, WidgetType};
 
 pub fn list_item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {

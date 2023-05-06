@@ -1,8 +1,8 @@
 use super::{list_item_ui, thumb_item_ui};
 use crate::global;
 use crate::state::{NavgatorType, State, Update};
-use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use cc_storage::{Object, ObjectType};
+use cc_ui::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 
 pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<usize>) {
     egui::Grid::new("list".to_string())

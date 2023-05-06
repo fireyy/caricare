@@ -509,9 +509,19 @@ name = "caricare"
 version = "0.1.0"
 dependencies = [
  "cc_core",
- "cc_gui",
+ "cc_files",
  "cc_runtime",
+ "cc_storage",
+ "cc_ui",
+ "crossbeam-channel",
  "eframe",
+ "egui",
+ "egui-notify",
+ "egui_extras",
+ "once_cell",
+ "rfd",
+ "serde",
+ "tracing",
 ]
 
 [[package]]
@@ -558,25 +568,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cc_gui"
-version = "0.1.0"
-dependencies = [
- "cc_core",
- "cc_files",
- "cc_runtime",
- "cc_storage",
- "crossbeam-channel",
- "eframe",
- "egui",
- "egui-notify",
- "egui_extras",
- "once_cell",
- "rfd",
- "serde",
- "tracing",
-]
-
-[[package]]
 name = "cc_runtime"
 version = "0.1.0"
 dependencies = [
@@ -602,6 +593,14 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "cc_ui"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui",
 ]
 
 [[package]]

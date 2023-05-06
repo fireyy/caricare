@@ -1,9 +1,9 @@
-use crate::state::State;
+use crate::state::{State, Update};
 use egui::Vec2;
 
 use super::confirm::ConfirmAction;
 use crate::global;
-use crate::theme::icon;
+use cc_ui::icon;
 
 #[derive(PartialEq)]
 pub enum ZoomType {
@@ -152,10 +152,13 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                         .on_hover_text("Generate Link")
                         .clicked()
                 {
-                    state.confirm.prompt(
-                        "Please enter the link expiration (in seconds):",
-                        ConfirmAction::GenerateUrl(3600),
-                    );
+                    global()
+                        .update_tx
+                        .send(Update::Prompt((
+                            "Please enter the link expiration (in seconds):".to_string(),
+                            ConfirmAction::GenerateUrl(3600),
+                        )))
+                        .unwrap();
                 }
                 if ui
                     .button(icon::CLIPBOARD)

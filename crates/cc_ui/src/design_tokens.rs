@@ -30,18 +30,16 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
         let mut font_definitions = egui::FontDefinitions::default();
         font_definitions.font_data.insert(
             "Inter-Medium".into(),
-            egui::FontData::from_static(include_bytes!("../data/Inter-Medium.otf")),
+            egui::FontData::from_static(include_bytes!("./data/Inter-Medium.otf")),
         );
         // icon font
         font_definitions.font_data.insert(
             "Icon".into(),
-            egui::FontData::from_static(include_bytes!("../data/icon.ttf")).tweak(
-                egui::FontTweak {
-                    scale: 1.0,
-                    y_offset_factor: 0.0,
-                    y_offset: 0.0,
-                },
-            ),
+            egui::FontData::from_static(include_bytes!("./data/icon.ttf")).tweak(egui::FontTweak {
+                scale: 1.0,
+                y_offset_factor: 0.0,
+                y_offset: 0.0,
+            }),
         );
 
         font_definitions
@@ -54,7 +52,7 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
         if cfg!(feature = "lang-cjk") {
             font_definitions.font_data.insert(
                 "SourceHan-Medium".into(),
-                egui::FontData::from_static(include_bytes!("../data/SourceHanSansCN-Medium.otf")),
+                egui::FontData::from_static(include_bytes!("./data/SourceHanSansCN-Medium.otf")),
             );
 
             font_definitions

@@ -1,5 +1,11 @@
+mod app;
+mod globals;
+mod pages;
+mod state;
+mod widgets;
+use app::App;
 use cc_core::init_core;
-use cc_gui::App;
+use globals::global;
 
 fn main() -> Result<(), eframe::Error> {
     init_core();
@@ -17,9 +23,9 @@ fn main() -> Result<(), eframe::Error> {
             fullsize_content: true,
 
             // Maybe hide the OS-specific "chrome" around the window:
-            decorated: !cc_gui::CUSTOM_WINDOW_DECORATIONS,
+            decorated: !cc_ui::CUSTOM_WINDOW_DECORATIONS,
             // To have rounded corners we need transparency:
-            transparent: cc_gui::CUSTOM_WINDOW_DECORATIONS,
+            transparent: cc_ui::CUSTOM_WINDOW_DECORATIONS,
 
             follow_system_theme: false,
             ..Default::default()
@@ -31,3 +37,29 @@ fn main() -> Result<(), eframe::Error> {
 
     Ok(())
 }
+
+macro_rules! spawn_evs {
+    ($state:ident, |$ev:ident, $client:ident, $ctx:ident| $fut:tt) => {{
+        let $client = $state.client().clone();
+        let $ev = $state.update_tx().clone();
+        let $ctx = $state.ctx.clone();
+        cc_runtime::spawn(async move {
+            cc_runtime::tokio::task::spawn(async move { $fut });
+        });
+    }};
+}
+
+macro_rules! spawn_transfer {
+    ($state:ident, |$transfer:ident, $ev:ident, $client:ident, $ctx:ident| $fut:tt) => {{
+        let $client = $state.client().clone();
+        let $transfer = $state.transfer_manager.progress_tx.clone();
+        let $ev = $state.update_tx().clone();
+        let $ctx = $state.ctx.clone();
+        cc_runtime::spawn(async move {
+            cc_runtime::tokio::task::spawn(async move { $fut });
+        });
+    }};
+}
+
+pub(crate) use spawn_evs;
+pub(crate) use spawn_transfer;

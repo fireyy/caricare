@@ -17,23 +17,33 @@ osx_minimum_system_version = "10.12"
 [features]
 default = ["services-s3-compatible"]
 # Enable Amazon Simple Storage Service support
-services-s3 = ["cc_gui/services-s3"]
+services-s3 = ["cc_storage/services-s3"]
 # Enable Aliyun Object Storage Service support
-services-oss = ["cc_gui/services-oss"]
+services-oss = ["cc_storage/services-oss"]
 # Enable Google Cloud Storage support
-services-gcs = ["cc_gui/services-gcs"]
+services-gcs = ["cc_storage/services-gcs"]
 # Enable Azure Blob Storage support
-services-azblob = ["cc_gui/services-azblob"]
+services-azblob = ["cc_storage/services-azblob"]
 # Enable S3-Compatible Object Storage support
-services-s3-compatible = ["cc_gui/services-s3-compatible"]
+services-s3-compatible = ["cc_storage/services-s3-compatible"]
 # Enable CJK char support
-lang-cjk = ["cc_gui/lang-cjk"]
+lang-cjk = ["cc_ui/lang-cjk"]
 
 [dependencies]
 cc_core = { workspace = true }
-cc_gui = { workspace = true }
+cc_ui = { workspace = true }
 eframe = { workspace = true }
 cc_runtime = { workspace = true }
+serde = { workspace = true }
+egui = { workspace = true }
+cc_files = { workspace = true }
+egui_extras = "0.21.0"
+rfd = "0.10"
+egui-notify = "0.6"
+tracing = { workspace = true }
+cc_storage = { workspace = true }
+crossbeam-channel = { workspace = true }
+once_cell = { workspace = true }
 
 [workspace]
 resolver = "2"
@@ -50,7 +60,7 @@ version = "0.1.0"
 
 [workspace.dependencies]
 cc_core = { path = "crates/cc_core" }
-cc_gui = { path = "crates/cc_gui" }
+cc_ui = { path = "crates/cc_ui" }
 cc_storage = { path = "crates/cc_storage" }
 cc_runtime = { path = "crates/cc_runtime" }
 cc_files = { path = "crates/cc_files" }
