@@ -80,7 +80,7 @@ pub struct State {
     pub is_show_result: bool,
     pub current_path: String,
     pub navigator: MemoryHistory,
-    pub confirm: Confirm,
+    confirm: Confirm,
     pub session: Session,
     pub sessions: Vec<Session>,
     pub err: Option<String>,

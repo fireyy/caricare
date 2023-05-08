@@ -3,8 +3,8 @@ use crate::widgets::{
     list::{list_ui, thumb_ui},
     status_bar_ui, top_bar_ui,
 };
-use crate::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use cc_core::ShowType;
+use cc_ui::{THUMB_LIST_HEIGHT, THUMB_LIST_WIDTH};
 use egui::NumExt;
 
 pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {

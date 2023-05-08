@@ -1,6 +1,6 @@
 use crate::global;
 use crate::state::State;
-use crate::theme::icon;
+use cc_ui::icon;
 
 pub fn transfer_panel_ui(ctx: &egui::Context, state: &mut State) {
     let frame = egui::Frame {

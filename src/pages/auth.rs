@@ -1,4 +1,5 @@
-use crate::state::State;
+use crate::global;
+use crate::state::{State, Update};
 use crate::widgets::{confirm::ConfirmAction, password};
 use egui_extras::{Column, TableBuilder};
 
@@ -45,7 +46,7 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                 ui.heading("History");
 
                 // auth_history_table(ui, &mut state);
-                let text_height = crate::theme::CCUi::table_line_height();
+                let text_height = cc_ui::CCUi::table_line_height();
 
                 let table = TableBuilder::new(ui)
                     .striped(true)
@@ -62,7 +63,7 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                     .min_scrolled_height(0.0);
 
                 table
-                    .header(crate::theme::CCUi::table_header_height(), |mut header| {
+                    .header(cc_ui::CCUi::table_header_height(), |mut header| {
                         header.col(|ui| {
                             ui.strong("ID");
                         });
@@ -94,10 +95,13 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                                     state.session = d.clone();
                                 }
                                 if ui.button("Remove").clicked() {
-                                    state.confirm.show(
-                                        "Do you confirm to remove this item?",
-                                        ConfirmAction::RemoveSession(d.clone()),
-                                    )
+                                    global()
+                                        .update_tx
+                                        .send(Update::Confirm((
+                                            "Do you confirm to remove this item?".to_string(),
+                                            ConfirmAction::RemoveSession(d.clone()),
+                                        )))
+                                        .unwrap();
                                 }
                             });
                         });

@@ -1,7 +1,7 @@
 use crate::global;
-use crate::theme::text_ellipsis;
-use crate::THUMB_LIST_HEIGHT;
 use cc_storage::Object;
+use cc_ui::text_ellipsis;
+use cc_ui::THUMB_LIST_HEIGHT;
 use egui::{self, vec2, RichText, Sense, WidgetInfo, WidgetType};
 
 pub fn thumb_item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {

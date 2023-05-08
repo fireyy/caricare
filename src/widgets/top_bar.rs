@@ -2,9 +2,9 @@ use super::confirm::ConfirmAction;
 use super::location_bar_ui;
 use crate::global;
 use crate::state::{FileAction, NavgatorType, Route, State, Status, Update};
-use crate::theme::icon;
 use cc_core::ShowType;
 use cc_storage::util::get_name_form_path;
+use cc_ui::icon;
 
 pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {
     let native_pixels_per_point = frame.info().native_pixels_per_point;
@@ -135,10 +135,13 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                             .button(format!("{} Create Folder", icon::CREATE_FOLDER))
                             .clicked()
                         {
-                            state.confirm.prompt(
-                                "Please enter the folder name:",
-                                ConfirmAction::CreateFolder("".into()),
-                            );
+                            global()
+                                .update_tx
+                                .send(Update::Prompt((
+                                    "Please enter the folder name:".to_string(),
+                                    ConfirmAction::CreateFolder("".into()),
+                                )))
+                                .unwrap();
                         }
                         ui.separator();
                         ui.add_enabled_ui(
@@ -158,13 +161,16 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                                 }
                                 if ui.button(format!("{} Rename", icon::RENAME)).clicked() {
                                     if let Some(obj) = state.list.iter().find(|x| x.selected) {
-                                        state.confirm.prompt(
-                                            "Please enter a new file name:",
-                                            ConfirmAction::RenameObject((
-                                                obj.key().to_string(),
-                                                "".into(),
-                                            )),
-                                        )
+                                        global()
+                                            .update_tx
+                                            .send(Update::Prompt((
+                                                "Please enter a new file name:".to_string(),
+                                                ConfirmAction::RenameObject((
+                                                    obj.key().to_string(),
+                                                    "".into(),
+                                                )),
+                                            )))
+                                            .unwrap();
                                     }
                                 }
                             },
@@ -173,10 +179,13 @@ pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fr
                             state.selected_item > 0 && state.file_action.is_none(),
                             |ui| {
                                 if ui.button(format!("{} Delete", icon::DELETE)).clicked() {
-                                    state.confirm.show(
-                                        "Do you confirm to delete selected items?",
-                                        ConfirmAction::RemoveFiles,
-                                    )
+                                    global()
+                                        .update_tx
+                                        .send(Update::Confirm((
+                                            "Do you confirm to delete selected items?".to_string(),
+                                            ConfirmAction::RemoveFiles,
+                                        )))
+                                        .unwrap();
                                 }
                             },
                         );

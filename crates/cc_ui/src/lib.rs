@@ -6,6 +6,9 @@ use eframe::epaint::text::{LayoutJob, TextWrapping};
 
 pub const CUSTOM_WINDOW_DECORATIONS: bool = false;
 
+pub static THUMB_LIST_WIDTH: f32 = 200.0;
+pub static THUMB_LIST_HEIGHT: f32 = 50.0;
+
 pub struct TopBarStyle {
     /// Height of the top bar
     pub height: f32,
