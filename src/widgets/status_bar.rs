@@ -16,16 +16,18 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
             ui.horizontal_wrapped(|ui| {
                 ui.visuals_mut().button_frame = false;
                 // egui::widgets::global_dark_light_mode_switch(ui);
+                if !state.session.is_empty() {
+                    ui.label(format!(
+                        "{} - Selected: {}/{}",
+                        state.session.service,
+                        state.selected_item,
+                        state.list.len()
+                    ));
+                }
 
                 if state.loading_more {
                     ui.add(egui::Spinner::new().size(12.0));
                 }
-
-                ui.label(format!(
-                    "Selected: {}/{}",
-                    state.selected_item,
-                    state.list.len()
-                ));
 
                 if state.next_query.is_none() && !state.loading_more {
                     // ui.label("No More Data.");

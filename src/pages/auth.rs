@@ -1,6 +1,7 @@
 use crate::global;
 use crate::state::{State, Update};
 use crate::widgets::{confirm::ConfirmAction, password};
+use cc_storage::ServiceType;
 use egui_extras::{Column, TableBuilder};
 
 pub fn auth_page(ctx: &egui::Context, state: &mut State) {
@@ -12,6 +13,37 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                     .spacing([10.0; 2])
                     .num_columns(2)
                     .show(ui, |ui| {
+                        ui.label("Service:");
+                        egui::ComboBox::from_label("Select your service.")
+                            .selected_text(format!("{}", state.session.service))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut state.session.service,
+                                    ServiceType::S3,
+                                    format!("{}", ServiceType::S3),
+                                );
+                                ui.selectable_value(
+                                    &mut state.session.service,
+                                    ServiceType::Oss,
+                                    format!("{}", ServiceType::Oss),
+                                );
+                                ui.selectable_value(
+                                    &mut state.session.service,
+                                    ServiceType::Gcs,
+                                    format!("{}", ServiceType::Gcs),
+                                );
+                                ui.selectable_value(
+                                    &mut state.session.service,
+                                    ServiceType::Azblob,
+                                    format!("{}", ServiceType::Azblob),
+                                );
+                                ui.selectable_value(
+                                    &mut state.session.service,
+                                    ServiceType::S3Compatible,
+                                    format!("{}", ServiceType::S3Compatible),
+                                );
+                            });
+                        ui.end_row();
                         ui.label("Endpoint:");
                         ui.text_edit_singleline(&mut state.session.endpoint);
                         ui.end_row();

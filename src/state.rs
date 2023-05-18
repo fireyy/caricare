@@ -122,6 +122,7 @@ impl State {
 
         if is_need_init {
             match Client::builder()
+                .service(&session.service)
                 .endpoint(&session.endpoint)
                 .access_key(&session.key_id)
                 .access_secret(&session.key_secret)

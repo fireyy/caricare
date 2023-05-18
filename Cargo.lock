@@ -585,6 +585,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "bytesize",
+ "cc_core",
  "chrono",
  "crossbeam-channel",
  "futures",

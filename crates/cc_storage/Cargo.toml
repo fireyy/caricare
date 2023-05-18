@@ -31,3 +31,4 @@ tokio = { version = "^1.0", features = ["fs", "io-util", "sync"] }
 pin-project = "1"
 crossbeam-channel = { workspace = true }
 async-trait = "0.1.68"
+cc_core = { workspace = true }

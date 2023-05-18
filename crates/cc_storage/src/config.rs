@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use cc_core::ServiceType;
 use std::{fmt::Debug, time::Duration};
 
 #[derive(Debug)]
@@ -25,6 +26,7 @@ pub(crate) struct HttpProxy {
 
 #[derive(Debug)]
 pub(crate) struct ClientConfig {
+    pub(crate) service: ServiceType,
     pub(crate) endpoint: String,
     pub(crate) access_key_id: String,
     pub(crate) access_key_secret: String,
@@ -49,6 +51,7 @@ pub(crate) struct ClientConfig {
 impl Default for ClientConfig {
     fn default() -> Self {
         Self {
+            service: Default::default(),
             endpoint: Default::default(),
             access_key_id: Default::default(),
             access_key_secret: Default::default(),
