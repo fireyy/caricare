@@ -7,14 +7,15 @@ use crate::partial_file::PartialFile;
 use crate::transfer::{TransferProgressInfo, TransferSender, TransferType};
 use crate::types::{Bucket, ListObjects, Object, Params};
 use crate::util::get_name;
-use crate::{CustomLayer, Result};
+use crate::Result;
 use anyhow::Context;
+use cc_core::ServiceType;
 
+use crate::services;
 use crate::stream::{
     AsyncReadProgressExt, BoxedStreamingUploader, StreamingUploader, TrackableBodyStream,
 };
 use futures::{AsyncReadExt, TryStreamExt};
-use opendal::services;
 use opendal::{Metadata, Metakey, Operator};
 
 #[derive(Clone)]
@@ -33,17 +34,16 @@ impl Client {
     fn new(config: ClientConfig) -> Result<Client> {
         let config = Arc::new(config);
 
-        let mut builder = services::S3::default();
-        builder.bucket(&config.bucket);
-        builder.endpoint(&config.endpoint);
-        builder.access_key_id(&config.access_key_id);
-        // builder.access_key_secret(&config.access_key_secret);
-        builder.secret_access_key(&config.access_key_secret);
-        // OSS need enable virtual host style
-        if config.endpoint.contains("aliyuncs.com") {
-            builder.enable_virtual_host_style();
-        }
-        let operator: Operator = Operator::new(builder)?.layer(CustomLayer).finish();
+        let operator = match &config.service {
+            ServiceType::S3 => services::s3::create(&config)?,
+            ServiceType::Oss => services::oss::create(&config)?,
+            ServiceType::Gcs => services::gcs::create(&config)?,
+            ServiceType::Azblob => services::azblob::create(&config)?,
+            ServiceType::S3Compatible => services::s3_compatible::create(&config)?,
+            // v => {
+            //     return Err(anyhow::anyhow!("Unsupported storage type: {:?}", v));
+            // }
+        };
 
         Ok(Client { config, operator })
     }
@@ -314,6 +314,11 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
+    pub fn service(mut self, service: &ServiceType) -> Self {
+        self.config.service = service.clone();
+        self
+    }
+
     pub fn endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.config.endpoint = endpoint.into();
         self

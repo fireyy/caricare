@@ -7,7 +7,7 @@ pub mod store;
 pub mod util;
 pub use error::CoreError;
 pub use history::MemoryHistory;
-pub use session::Session;
+pub use session::{ServiceType, Session};
 pub use setting::{Setting, ShowType};
 pub use tracing;
 
