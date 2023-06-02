@@ -16,7 +16,7 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
 }
 
 fn mouse_wheel_zoom(delta: f32, pointer_delta: Vec2, state: &mut State) {
-    let delta = zoomratio((delta - 1.0) * 2.0, state.img_zoom);
+    let delta = zoomratio((delta / 10.).max(-5.0).min(5.0), state.img_zoom);
     let new_scale = state.img_zoom + delta;
     // limit scale
     if new_scale > 0.01 && new_scale < 40. {
@@ -86,9 +86,14 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                             });
                         });
                     if ui.rect_contains_pointer(resp.inner_rect) {
-                        let (zoom, pointer_delta, _pointer_down, _modifiers) = ui.input(|i| {
+                        let (zoom, pointer_delta, _pointer_down, modifiers) = ui.input(|i| {
                             let zoom = i.events.iter().find_map(|e| match e {
-                                egui::Event::Zoom(v) => Some(*v),
+                                // egui::Event::Zoom(v) => Some(*v),
+                                egui::Event::MouseWheel {
+                                    unit: _unit,
+                                    delta,
+                                    modifiers: _modifiers,
+                                } => Some(delta.y),
                                 _ => None,
                             });
                             (
@@ -98,10 +103,12 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                                 i.modifiers,
                             )
                         });
-                        if let Some(zoom) = zoom {
-                            // tracing::info!("zoom: {:?}, pointer: {:?}", zoom, pointer_delta,);
-                            if let Some(pointer_delta) = pointer_delta {
-                                mouse_wheel_zoom(zoom, pointer_delta.to_vec2(), state);
+                        if modifiers.ctrl {
+                            if let Some(zoom) = zoom {
+                                tracing::info!("zoom: {:?}, pointer: {:?}", zoom, pointer_delta,);
+                                if let Some(pointer_delta) = pointer_delta {
+                                    mouse_wheel_zoom(zoom, pointer_delta.to_vec2(), state);
+                                }
                             }
                         }
                     }

@@ -43,7 +43,9 @@ pub fn transfer_panel_ui(ctx: &egui::Context, state: &mut State) {
                     egui::ScrollArea::vertical()
                         .id_source("transfer_scroller")
                         .auto_shrink([false; 2])
-                        .always_show_scroll(true)
+                        .scroll_bar_visibility(
+                            egui::scroll_area::ScrollBarVisibility::AlwaysVisible,
+                        )
                         .show_rows(ui, row_height, row_size, |ui, row_range| {
                             // tracing::info!("row_range: {:?}", row_range);
                             egui::Grid::new("transfer_grid".to_string())

@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-///! A toast notification system for egui, roughly based on <https://github.com/urholaukkarinen/egui-toast>.
+//! A toast notification system for egui, roughly based on <https://github.com/urholaukkarinen/egui-toast>.
 use std::{collections::HashMap, fmt};
 
 use egui::Color32;
