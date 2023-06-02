@@ -10,7 +10,8 @@ pub fn list_ui(state: &mut State, ui: &mut egui::Ui, row_range: std::ops::Range<
         .striped(true)
         .show(ui, |ui| {
             for data in state.list[row_range].iter_mut() {
-                let response = list_item_ui(ui, data);
+                let is_current = data.key() == state.current_object.key();
+                let response = list_item_ui(ui, data, is_current);
                 if response.on_hover_text(data.name()).clicked() {
                     handle_click(data);
                 }
@@ -37,7 +38,8 @@ pub fn thumb_ui(
                 for j in 0..num_cols {
                     if let Some(data) = state.list.get_mut(j + i * num_cols) {
                         egui::Frame::none().show(ui, |ui| {
-                            let response = thumb_item_ui(ui, data);
+                            let is_current = data.key() == state.current_object.key();
+                            let response = thumb_item_ui(ui, data, is_current);
                             if response.on_hover_text(data.name()).clicked() {
                                 handle_click(data);
                             }

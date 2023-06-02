@@ -64,7 +64,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                     .on_hover_text("Close panel")
                     .clicked()
                 {
-                    state.is_preview = false;
+                    state.close_preview();
                 }
             });
             let mut is_image = false;
