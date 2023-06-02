@@ -4,7 +4,7 @@ use cc_ui::text_ellipsis;
 use cc_ui::THUMB_LIST_HEIGHT;
 use egui::{self, vec2, RichText, Sense, WidgetInfo, WidgetType};
 
-pub fn thumb_item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
+pub fn thumb_item_ui(ui: &mut egui::Ui, data: &mut Object, is_current: bool) -> egui::Response {
     let initial_size = vec2(
         ui.available_width(),
         THUMB_LIST_HEIGHT, // Assume there will be
@@ -14,12 +14,12 @@ pub fn thumb_item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
 
     if ui.is_rect_visible(rect) {
         let visuals = ui.style().interact(&response);
-        let mut fill_color = if response.hovered() {
+        let mut fill_color = if response.hovered() || data.selected {
             visuals.bg_fill
         } else {
             global().cc_ui.design_tokens.bottom_bar_color
         };
-        if data.selected {
+        if is_current {
             fill_color = global().cc_ui.design_tokens.selection_color;
         }
         ui.allocate_ui_at_rect(rect, |ui| {

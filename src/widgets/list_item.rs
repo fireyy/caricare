@@ -5,7 +5,7 @@ use cc_storage::Object;
 use cc_ui::icon;
 use egui::{self, style::Margin, vec2, Color32, Frame, Sense, WidgetInfo, WidgetType};
 
-pub fn list_item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
+pub fn list_item_ui(ui: &mut egui::Ui, data: &mut Object, is_current: bool) -> egui::Response {
     let row_height = ui.text_style_height(&egui::TextStyle::Body);
     let initial_size = vec2(
         ui.available_width(),
@@ -16,12 +16,12 @@ pub fn list_item_ui(ui: &mut egui::Ui, data: &mut Object) -> egui::Response {
 
     if ui.is_rect_visible(rect) {
         let visuals = ui.style().interact(&response);
-        let mut fill_color = if response.hovered() {
+        let mut fill_color = if response.hovered() || data.selected {
             visuals.bg_fill
         } else {
             Color32::TRANSPARENT
         };
-        if data.selected {
+        if is_current {
             fill_color = global().cc_ui.design_tokens.selection_color;
         }
         ui.allocate_ui_at_rect(rect, |ui| {

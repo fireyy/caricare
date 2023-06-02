@@ -620,4 +620,9 @@ impl State {
             });
         }
     }
+
+    pub(crate) fn close_preview(&mut self) {
+        self.is_preview = false;
+        self.current_object = Object::default();
+    }
 }
