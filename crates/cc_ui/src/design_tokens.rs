@@ -35,11 +35,7 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
         // icon font
         font_definitions.font_data.insert(
             "Icon".into(),
-            egui::FontData::from_static(include_bytes!("./data/icon.ttf")).tweak(egui::FontTweak {
-                scale: 1.0,
-                y_offset_factor: 0.0,
-                y_offset: 0.0,
-            }),
+            egui::FontData::from_static(include_bytes!("./data/icon.ttf")),
         );
 
         font_definitions

@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-egui_extras = { version = "0.21.0", features = ["image", "svg"] }
+egui_extras = { workspace = true }
 reqwest = { workspace = true }
 tokio-stream = { version = "0.1.11", default-features = false }
 image = { version = "0.24.6", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
