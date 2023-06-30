@@ -20,7 +20,8 @@ fn mouse_wheel_zoom(delta: f32, pointer_delta: Vec2, state: &mut State) {
     let new_scale = state.img_zoom + delta;
     // limit scale
     if new_scale > 0.01 && new_scale < 40. {
-        state.offset -= scale_pt(state.offset, pointer_delta, state.img_zoom, delta);
+        state.img_zoom_offset -=
+            scale_pt(state.img_zoom_offset, pointer_delta, state.img_zoom, delta);
         state.img_zoom += delta;
     }
 }
@@ -37,8 +38,12 @@ fn zoom_action(win_size: egui::Vec2, state: &mut State, zoom_type: ZoomType) {
     if new_scale > 0.05 && new_scale < 40. {
         // We want to zoom towards the center
         let center = Vec2::new(win_size.x / 2., win_size.y / 2.);
-        state.offset -= scale_pt(state.offset, center, state.img_zoom, delta);
+        state.img_zoom_offset -= scale_pt(state.img_zoom_offset, center, state.img_zoom, delta);
         state.img_zoom += delta;
+        println!(
+            "offset: {:?}, zoom: {}",
+            state.img_zoom_offset, state.img_zoom
+        )
     }
 }
 
@@ -58,6 +63,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
         .frame(frame)
         .max_width(400.0)
         .show_animated(ctx, state.is_preview, |ui| {
+            let area_size = ui.available_size();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                 if ui
                     .button(icon::CLOSE)
@@ -72,11 +78,15 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                 if file.is_image() {
                     is_image = true;
                     let mut size = file.size_vec2();
-                    size = if state.img_zoom != 1.0 {
-                        size * state.img_zoom
+                    state.img_default_zoom = if size.x > ui.available_width() {
+                        ui.available_width() / size.x
                     } else {
-                        size * (ui.available_width() / size.x).min(1.0)
+                        1.0
                     };
+                    if state.img_zoom == 1.0 {
+                        state.img_zoom = state.img_default_zoom;
+                    }
+                    size = size * state.img_zoom;
                     let resp = egui::ScrollArea::both()
                         .auto_shrink([false; 2])
                         .max_height(win_size.y - 110.0)
@@ -129,21 +139,21 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                 ui.horizontal(|ui| {
                     ui.label(format!("{} Zoom: ", icon::CROSS_HAIR));
                     if ui.button(icon::ZOOM_IN).on_hover_text("Zoom In").clicked() {
-                        zoom_action(win_size, state, ZoomType::In);
+                        zoom_action(area_size, state, ZoomType::In);
                     }
                     if ui
                         .button(icon::ZOOM_ACTUAL)
                         .on_hover_text("Zoom to window size")
                         .clicked()
                     {
-                        state.img_zoom = 1.0;
+                        state.img_zoom = state.img_default_zoom;
                     }
                     if ui
                         .button(icon::ZOOM_OUT)
                         .on_hover_text("Zoom Out")
                         .clicked()
                     {
-                        zoom_action(win_size, state, ZoomType::Out);
+                        zoom_action(area_size, state, ZoomType::Out);
                     }
                 });
             }
