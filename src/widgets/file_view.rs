@@ -1,8 +1,10 @@
 use crate::state::{State, Update};
+use eframe::emath;
 use egui::Vec2;
 
 use super::confirm::ConfirmAction;
 use crate::global;
+use crate::util;
 use cc_ui::icon;
 
 #[derive(PartialEq)]
@@ -30,16 +32,24 @@ fn scale_pt(origin: Vec2, pt: Vec2, scale: f32, scale_inc: f32) -> Vec2 {
     ((pt - origin) * scale_inc) / scale
 }
 
-fn zoom_action(win_size: egui::Vec2, state: &mut State, zoom_type: ZoomType) {
+fn zoom_action(state: &mut State, zoom_type: ZoomType) {
     let i = if zoom_type == ZoomType::In { 3.5 } else { -3.5 };
     let delta = zoomratio(i, state.img_zoom);
     let new_scale = state.img_zoom + delta;
     // limit scale
     if new_scale > 0.05 && new_scale < 40. {
         // We want to zoom towards the center
-        let center = Vec2::new(win_size.x / 2., win_size.y / 2.);
-        state.img_zoom_offset -= scale_pt(state.img_zoom_offset, center, state.img_zoom, delta);
-        state.img_zoom += delta;
+        let new_zoom = state.img_zoom + delta;
+        let pos: emath::Pos2 = state.disp_rect.pos.into();
+        let size: emath::Vec2 = state.disp_rect.size.into();
+        let offset = size * 0.5;
+        let ratio = new_zoom / state.img_zoom;
+        let x = ratio * (pos.x + offset.x) - offset.x;
+        let y = ratio * (pos.y + offset.y) - offset.y;
+
+        state.img_scroll = Some(emath::Pos2::new(x, y));
+
+        state.img_zoom = new_zoom;
         println!(
             "offset: {:?}, zoom: {}",
             state.img_zoom_offset, state.img_zoom
@@ -87,14 +97,27 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                         state.img_zoom = state.img_default_zoom;
                     }
                     size = size * state.img_zoom;
-                    let resp = egui::ScrollArea::both()
-                        .auto_shrink([false; 2])
-                        .max_height(win_size.y - 110.0)
-                        .show(ui, |ui| {
-                            ui.centered_and_justified(|ui| {
-                                file.show_size(ui, size);
-                            });
-                        });
+                    let scroll = state.img_scroll.take();
+                    let widget = if let Some(pos) = &scroll {
+                        egui::ScrollArea::both()
+                            .auto_shrink([false; 2])
+                            .scroll_offset(pos.to_vec2())
+                            .max_height(win_size.y - 110.0)
+                    } else {
+                        egui::ScrollArea::both()
+                            .max_height(win_size.y - 110.0)
+                            .auto_shrink([false; 2])
+                    };
+                    ui.spacing_mut().scroll_bar_inner_margin = 0.0;
+                    let resp = widget.show(ui, |ui| {
+                        file.show_size(ui, size);
+                    });
+                    let pos = resp.state.offset;
+                    let display_rect = util::Rect {
+                        pos: pos.into(),
+                        size: resp.inner_rect.size().into(),
+                    };
+                    state.disp_rect = display_rect;
                     if ui.rect_contains_pointer(resp.inner_rect) {
                         let (zoom, pointer_delta, _pointer_down, _modifiers) = ui.input(|i| {
                             let zoom = i.events.iter().find_map(|e| match e {
@@ -132,7 +155,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                 ui.horizontal(|ui| {
                     ui.label(format!("{} Zoom: ", icon::CROSS_HAIR));
                     if ui.button(icon::ZOOM_IN).on_hover_text("Zoom In").clicked() {
-                        zoom_action(area_size, state, ZoomType::In);
+                        zoom_action(state, ZoomType::In);
                     }
                     if ui
                         .button(icon::ZOOM_ACTUAL)
@@ -146,7 +169,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                         .on_hover_text("Zoom Out")
                         .clicked()
                     {
-                        zoom_action(area_size, state, ZoomType::Out);
+                        zoom_action(state, ZoomType::Out);
                     }
                 });
             }

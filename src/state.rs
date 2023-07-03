@@ -1,4 +1,5 @@
 use crate::global;
+use crate::util;
 use crate::widgets::toasts::Toasts;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
@@ -72,7 +73,9 @@ pub struct State {
     pub is_preview: bool,
     pub img_zoom: f32,
     pub img_default_zoom: f32,
+    pub img_scroll: Option<eframe::emath::Pos2>,
     pub img_zoom_offset: egui::Vec2,
+    pub disp_rect: util::Rect,
     pub loading_more: bool,
     pub next_query: Option<Params>,
     pub scroll_top: bool,
@@ -152,7 +155,9 @@ impl State {
             is_preview: false,
             img_zoom: 1.0,
             img_default_zoom: 1.0,
+            img_scroll: Some(eframe::emath::Pos2::new(0.0, 0.0)),
             img_zoom_offset: Default::default(),
+            disp_rect: util::Rect::default(),
             loading_more: false,
             next_query: None,
             scroll_top: false,
