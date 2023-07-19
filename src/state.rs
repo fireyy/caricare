@@ -1,4 +1,5 @@
 use crate::global;
+use crate::util;
 use crate::widgets::toasts::Toasts;
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
@@ -71,7 +72,9 @@ pub struct State {
     pub setting: Setting,
     pub is_preview: bool,
     pub img_zoom: f32,
-    pub offset: egui::Vec2,
+    pub img_default_zoom: f32,
+    pub img_scroll: Option<eframe::emath::Pos2>,
+    pub disp_rect: util::Rect,
     pub loading_more: bool,
     pub next_query: Option<Params>,
     pub scroll_top: bool,
@@ -150,7 +153,9 @@ impl State {
             err: None,
             is_preview: false,
             img_zoom: 1.0,
-            offset: Default::default(),
+            img_default_zoom: 1.0,
+            img_scroll: Some(eframe::emath::Pos2::new(0.0, 0.0)),
+            disp_rect: util::Rect::default(),
             loading_more: false,
             next_query: None,
             scroll_top: false,
@@ -255,6 +260,7 @@ impl State {
                 Update::ViewObject(obj) => {
                     self.head_object(obj.key());
                     self.current_object = obj;
+                    self.restore_img_zoom();
                     self.is_preview = true;
                 }
                 Update::GetObject(result) => match result {
@@ -624,5 +630,12 @@ impl State {
     pub(crate) fn close_preview(&mut self) {
         self.is_preview = false;
         self.current_object = Object::default();
+        self.restore_img_zoom();
+    }
+
+    fn restore_img_zoom(&mut self) {
+        self.img_zoom = 1.0;
+        self.img_default_zoom = 1.0;
+        self.img_scroll = Some(eframe::emath::Pos2::new(0.0, 0.0));
     }
 }

@@ -6,6 +6,7 @@ mod widgets;
 use app::App;
 use cc_core::init_core;
 use globals::global;
+mod util;
 
 fn main() -> Result<(), eframe::Error> {
     init_core();
