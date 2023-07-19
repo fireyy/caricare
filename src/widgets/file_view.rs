@@ -73,7 +73,6 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
         .frame(frame)
         .max_width(400.0)
         .show_animated(ctx, state.is_preview, |ui| {
-            let area_size = ui.available_size();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                 if ui
                     .button(icon::CLOSE)
