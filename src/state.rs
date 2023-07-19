@@ -262,6 +262,7 @@ impl State {
                 Update::ViewObject(obj) => {
                     self.head_object(obj.key());
                     self.current_object = obj;
+                    self.restore_img_zoom();
                     self.is_preview = true;
                 }
                 Update::GetObject(result) => match result {
@@ -631,5 +632,12 @@ impl State {
     pub(crate) fn close_preview(&mut self) {
         self.is_preview = false;
         self.current_object = Object::default();
+        self.restore_img_zoom();
+    }
+
+    fn restore_img_zoom(&mut self) {
+        self.img_zoom = 1.0;
+        self.img_default_zoom = 1.0;
+        self.img_scroll = Some(eframe::emath::Pos2::new(0.0, 0.0));
     }
 }
