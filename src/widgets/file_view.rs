@@ -88,7 +88,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                     if state.img_zoom == 1.0 {
                         state.img_zoom = state.img_default_zoom;
                     }
-                    size = size * state.img_zoom;
+                    size *= state.img_zoom;
                     let scroll = state.img_scroll.take();
                     let widget = if let Some(pos) = &scroll {
                         egui::ScrollArea::both()
