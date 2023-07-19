@@ -1,6 +1,5 @@
 use crate::state::{State, Update};
 use eframe::emath;
-use egui::Vec2;
 
 use super::confirm::ConfirmAction;
 use crate::global;
@@ -17,19 +16,26 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
-fn mouse_wheel_zoom(delta: f32, pointer_delta: Vec2, state: &mut State) {
-    let delta = zoomratio((delta / 10.).max(-5.0).min(5.0), state.img_zoom);
+fn scroll_to_center(new_scale: f32, state: &mut State) {
+    // We want to zoom towards the center
+    let pos: emath::Pos2 = state.disp_rect.pos.into();
+    let size: emath::Vec2 = state.disp_rect.size.into();
+    let offset = size * 0.5;
+    let ratio = new_scale / state.img_zoom;
+    let x = ratio * (pos.x + offset.x) - offset.x;
+    let y = ratio * (pos.y + offset.y) - offset.y;
+
+    state.img_scroll = Some(emath::Pos2::new(x, y));
+    state.img_zoom = new_scale;
+}
+
+fn mouse_wheel_zoom(delta: f32, state: &mut State) {
+    let delta = zoomratio((delta - 1.0) * 2.0, state.img_zoom);
     let new_scale = state.img_zoom + delta;
     // limit scale
     if new_scale > 0.01 && new_scale < 40. {
-        state.img_zoom_offset -=
-            scale_pt(state.img_zoom_offset, pointer_delta, state.img_zoom, delta);
-        state.img_zoom += delta;
+        scroll_to_center(new_scale, state);
     }
-}
-
-fn scale_pt(origin: Vec2, pt: Vec2, scale: f32, scale_inc: f32) -> Vec2 {
-    ((pt - origin) * scale_inc) / scale
 }
 
 fn zoom_action(state: &mut State, zoom_type: ZoomType) {
@@ -38,22 +44,9 @@ fn zoom_action(state: &mut State, zoom_type: ZoomType) {
     let new_scale = state.img_zoom + delta;
     // limit scale
     if new_scale > 0.05 && new_scale < 40. {
-        // We want to zoom towards the center
-        let new_zoom = state.img_zoom + delta;
-        let pos: emath::Pos2 = state.disp_rect.pos.into();
-        let size: emath::Vec2 = state.disp_rect.size.into();
-        let offset = size * 0.5;
-        let ratio = new_zoom / state.img_zoom;
-        let x = ratio * (pos.x + offset.x) - offset.x;
-        let y = ratio * (pos.y + offset.y) - offset.y;
+        scroll_to_center(new_scale, state);
 
-        state.img_scroll = Some(emath::Pos2::new(x, y));
-
-        state.img_zoom = new_zoom;
-        println!(
-            "offset: {:?}, zoom: {}",
-            state.img_zoom_offset, state.img_zoom
-        )
+        // println!("offset: {:?}, zoom: {}", state.img_scroll, state.img_zoom)
     }
 }
 
@@ -118,7 +111,7 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                     };
                     state.disp_rect = display_rect;
                     if ui.rect_contains_pointer(resp.inner_rect) {
-                        let (zoom, pointer_delta, _pointer_down, modifiers) = ui.input(|i| {
+                        let (zoom, _pointer_delta, _pointer_down, _modifiers) = ui.input(|i| {
                             let zoom = i.events.iter().find_map(|e| match e {
                                 // egui::Event::Zoom(v) => Some(*v),
                                 egui::Event::MouseWheel {
@@ -135,13 +128,9 @@ pub fn file_view_ui(ctx: &egui::Context, state: &mut State) {
                                 i.modifiers,
                             )
                         });
-                        if modifiers.ctrl {
-                            if let Some(zoom) = zoom {
-                                tracing::info!("zoom: {:?}, pointer: {:?}", zoom, pointer_delta,);
-                                if let Some(pointer_delta) = pointer_delta {
-                                    mouse_wheel_zoom(zoom, pointer_delta.to_vec2(), state);
-                                }
-                            }
+                        if let Some(zoom) = zoom {
+                            // tracing::info!("zoom: {:?}", zoom);
+                            mouse_wheel_zoom(zoom, state);
                         }
                     }
                 } else {
