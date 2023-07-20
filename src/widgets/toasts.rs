@@ -84,6 +84,14 @@ impl Toasts {
         self
     }
 
+    pub fn msg(&mut self, msg: impl Into<String>, t: ToastKind) {
+        self.add(Toast {
+            kind: t,
+            text: msg.into(),
+            options: ToastOptions::with_ttl_in_seconds(4.0),
+        });
+    }
+
     pub fn error(&mut self, msg: impl Into<String>) {
         self.add(Toast {
             kind: ToastKind::Error,

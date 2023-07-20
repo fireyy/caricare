@@ -1,9 +1,8 @@
 use crate::global;
-use crate::util;
-use crate::widgets::toasts::Toasts;
+use crate::widgets::toasts::{ToastKind, Toasts};
 use crate::widgets::{
     confirm::{Confirm, ConfirmAction},
-    file_view_ui, log_panel_ui, transfer_panel_ui,
+    log_panel_ui, transfer_panel_ui, FileView,
 };
 use crate::{spawn_evs, spawn_transfer};
 use cc_core::{log::LogItem, store, tracing, MemoryHistory, Session, Setting};
@@ -54,6 +53,7 @@ pub enum Update {
     Deleted(ClientResult<()>),
     CreateFolder(ClientResult<()>),
     ViewObject(Object),
+    CloseObject,
     HeadObject(ClientResult<Metadata>),
     GetObject(ClientResult<(String, Vec<u8>)>),
     BucketInfo(ClientResult<Bucket>),
@@ -62,6 +62,7 @@ pub enum Update {
     SignatureUrl(ClientResult<String>),
     Confirm((String, ConfirmAction)),
     Prompt((String, ConfirmAction)),
+    Toast((String, ToastKind)),
 }
 
 pub struct State {
@@ -70,11 +71,7 @@ pub struct State {
     pub current_object: Object,
     pub confirm_rx: crossbeam_channel::Receiver<ConfirmAction>,
     pub setting: Setting,
-    pub is_preview: bool,
-    pub img_zoom: f32,
-    pub img_default_zoom: f32,
-    pub img_scroll: Option<eframe::emath::Pos2>,
-    pub disp_rect: util::Rect,
+    pub file_view: FileView,
     pub loading_more: bool,
     pub next_query: Option<Params>,
     pub scroll_top: bool,
@@ -151,11 +148,7 @@ impl State {
             list: vec![],
             confirm_rx,
             err: None,
-            is_preview: false,
-            img_zoom: 1.0,
-            img_default_zoom: 1.0,
-            img_scroll: Some(eframe::emath::Pos2::new(0.0, 0.0)),
-            disp_rect: util::Rect::default(),
+            file_view: FileView::new(),
             loading_more: false,
             next_query: None,
             scroll_top: false,
@@ -260,8 +253,11 @@ impl State {
                 Update::ViewObject(obj) => {
                     self.head_object(obj.key());
                     self.current_object = obj;
-                    self.restore_img_zoom();
-                    self.is_preview = true;
+                    self.file_view.reset();
+                    self.file_view.show();
+                }
+                Update::CloseObject => {
+                    self.current_object = Default::default();
                 }
                 Update::GetObject(result) => match result {
                     Ok((_name, data)) => {
@@ -330,6 +326,7 @@ impl State {
                 },
                 Update::Prompt((message, action)) => self.confirm.prompt(message, action),
                 Update::Confirm((message, action)) => self.confirm.show(message, action),
+                Update::Toast((message, t)) => self.toasts.msg(message, t),
             }
         }
 
@@ -353,7 +350,10 @@ impl State {
         }
 
         if self.client.is_some() {
-            file_view_ui(ctx, self);
+            if !self.current_object.key().is_empty() && self.current_object.is_file() {
+                let file = self.file_cache.check(self.current_object.key());
+                self.file_view.ui(ctx, &self.current_object, file);
+            }
             log_panel_ui(ctx, self);
             transfer_panel_ui(ctx, self);
         }
@@ -369,13 +369,13 @@ impl State {
         self.client.as_ref().expect("Oss not initialized yet")
     }
 
-    pub fn bucket(&self) -> &Bucket {
-        self.bucket.as_ref().expect("Bucket not initialized yet")
-    }
+    // pub fn bucket(&self) -> &Bucket {
+    //     self.bucket.as_ref().expect("Bucket not initialized yet")
+    // }
 
-    pub fn bucket_is_private(&self) -> bool {
-        self.bucket().is_private()
-    }
+    // pub fn bucket_is_private(&self) -> bool {
+    //     self.bucket().is_private()
+    // }
 
     pub fn get_signature_url(&self, name: String, expire: u64) {
         spawn_evs!(self, |evs, client, ctx| {
@@ -625,17 +625,5 @@ impl State {
                 ctx.request_repaint();
             });
         }
-    }
-
-    pub(crate) fn close_preview(&mut self) {
-        self.is_preview = false;
-        self.current_object = Object::default();
-        self.restore_img_zoom();
-    }
-
-    fn restore_img_zoom(&mut self) {
-        self.img_zoom = 1.0;
-        self.img_default_zoom = 1.0;
-        self.img_scroll = Some(eframe::emath::Pos2::new(0.0, 0.0));
     }
 }

@@ -223,7 +223,7 @@ impl Cache {
         }
     }
 
-    pub fn check(&mut self, url: &str) -> Option<&FileType> {
+    pub fn check(&self, url: &str) -> Option<&FileType> {
         self.map.get(url)
     }
 

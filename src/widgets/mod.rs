@@ -13,7 +13,7 @@ mod top_bar;
 mod transfer_panel;
 
 // pub use action_bar::action_bar_ui;
-pub use file_view::file_view_ui;
+pub use file_view::FileView;
 pub use list_item::list_item_ui;
 pub use location_bar::location_bar_ui;
 pub use log_panel::log_panel_ui;
