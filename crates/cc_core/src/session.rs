@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter, Result};
+use std::slice::Iter;
 
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq, Deserialize, Serialize)]
 pub enum ServiceType {
@@ -9,6 +10,14 @@ pub enum ServiceType {
     Azblob,
     #[default]
     S3Compatible,
+}
+
+impl ServiceType {
+    pub fn iterator() -> Iter<'static, ServiceType> {
+        use self::ServiceType::*;
+        static SERVICE_TYPE: [ServiceType; 5] = [S3, Oss, Gcs, Azblob, S3Compatible];
+        SERVICE_TYPE.iter()
+    }
 }
 
 impl Display for ServiceType {

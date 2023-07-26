@@ -17,31 +17,13 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                         egui::ComboBox::from_label("Select your service.")
                             .selected_text(format!("{}", state.session.service))
                             .show_ui(ui, |ui| {
-                                ui.selectable_value(
-                                    &mut state.session.service,
-                                    ServiceType::S3,
-                                    format!("{}", ServiceType::S3),
-                                );
-                                ui.selectable_value(
-                                    &mut state.session.service,
-                                    ServiceType::Oss,
-                                    format!("{}", ServiceType::Oss),
-                                );
-                                ui.selectable_value(
-                                    &mut state.session.service,
-                                    ServiceType::Gcs,
-                                    format!("{}", ServiceType::Gcs),
-                                );
-                                ui.selectable_value(
-                                    &mut state.session.service,
-                                    ServiceType::Azblob,
-                                    format!("{}", ServiceType::Azblob),
-                                );
-                                ui.selectable_value(
-                                    &mut state.session.service,
-                                    ServiceType::S3Compatible,
-                                    format!("{}", ServiceType::S3Compatible),
-                                );
+                                for service in ServiceType::iterator() {
+                                    ui.selectable_value(
+                                        &mut state.session.service,
+                                        service.to_owned(),
+                                        format!("{service}"),
+                                    );
+                                }
                             });
                         ui.end_row();
                         ui.label("Endpoint:");
