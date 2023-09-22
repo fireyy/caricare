@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use opendal::ops::*;
 use opendal::raw::*;
 use opendal::*;
 
@@ -39,20 +38,11 @@ impl<A: Accessor> LayeredAccessor for CustomAccessor<A> {
     }
 
     async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Pager)> {
-        // let args = args.with_limit(10);
         self.inner.list(path, args).await
     }
 
     fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingPager)> {
         self.inner.blocking_list(path, args)
-    }
-
-    async fn scan(&self, path: &str, args: OpScan) -> Result<(RpScan, Self::Pager)> {
-        self.inner.scan(path, args).await
-    }
-
-    fn blocking_scan(&self, path: &str, args: OpScan) -> Result<(RpScan, Self::BlockingPager)> {
-        self.inner.blocking_scan(path, args)
     }
 }
 

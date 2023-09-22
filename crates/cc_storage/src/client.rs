@@ -84,7 +84,7 @@ impl Client {
 
     pub async fn get_object_range(&self, object: impl AsRef<str>) -> Result<(String, Vec<u8>)> {
         let object = object.as_ref();
-        let result = self.operator.range_read(object, ..128).await?;
+        let result = self.operator.read_with(object).range(..128).await?;
 
         Ok((object.to_string(), result))
     }
@@ -113,20 +113,19 @@ impl Client {
     pub async fn list_v2(&self, query: Option<String>) -> Result<ListObjects> {
         tracing::debug!("List object: {:?}", query);
         let path = query.map_or("".into(), |x| format!("{x}/"));
-        let mut stream = self.operator.list(&path).await?;
+        //TODO 分页功能
+        let mut stream = self
+            .operator
+            .lister_with(&path)
+            .metakey(Metakey::Mode | Metakey::ContentLength | Metakey::LastModified)
+            .await?;
 
         let mut list_objects = ListObjects::default();
         let mut common_prefixes = Vec::new();
         let mut objects = Vec::new();
 
         while let Some(entry) = stream.try_next().await? {
-            let meta = self
-                .operator
-                .metadata(
-                    &entry,
-                    Metakey::Mode | Metakey::ContentLength | Metakey::LastModified,
-                )
-                .await?;
+            let meta = entry.metadata();
 
             if meta.is_dir() {
                 common_prefixes.push(Object::new_folder(entry.path()));
@@ -159,7 +158,6 @@ impl Client {
         Ok(())
     }
 
-    // TODO: The copy function is not compatible with OSS
     pub async fn copy_object(
         &self,
         src: impl AsRef<str>,
@@ -192,7 +190,8 @@ impl Client {
         let reader = match start_pos {
             Some(start_position) => {
                 self.operator
-                    .range_reader(path, start_position as u64..)
+                    .reader_with(path)
+                    .range(start_position as u64..)
                     .await?
             }
             None => self.operator.reader(path).await?,
