@@ -102,7 +102,7 @@ impl Client {
     pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<bool> {
         let object = object.as_ref();
         self.operator.delete(object).await?;
-        let result = self.operator.is_exist(&object).await?;
+        let result = self.operator.is_exist(object).await?;
 
         Ok(result)
     }
