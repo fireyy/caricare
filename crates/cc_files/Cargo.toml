@@ -6,16 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-egui_extras = { workspace = true }
-reqwest = { workspace = true }
-tokio-stream = { version = "0.1.11", default-features = false }
-image = { version = "0.24.6", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 egui = { workspace = true }
-cc_runtime = { workspace = true }
-tokio = "1.22.0"
 anyhow = "1.0.66"
 serde = { workspace = true }
 enum-map = { version = "2", features = ["serde"] }
 infer = { workspace = true }
 tracing = { workspace = true }
-crossbeam-channel = { workspace = true }

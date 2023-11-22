@@ -503,6 +503,7 @@ dependencies = [
  "egui 0.23.0",
  "egui-notify",
  "egui_extras",
+ "image",
  "once_cell",
  "rfd",
  "serde",
@@ -538,17 +539,10 @@ name = "cc_files"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cc_runtime",
- "crossbeam-channel",
  "egui 0.23.0",
- "egui_extras",
  "enum-map",
- "image",
  "infer",
- "reqwest",
  "serde",
- "tokio",
- "tokio-stream",
  "tracing",
 ]
 
@@ -3525,17 +3519,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
 dependencies = [
  "rustls",
- "tokio",
-]
-
-[[package]]
-name = "tokio-stream"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d660770404473ccd7bc9f8b28494a811bc18542b915c0855c51e8f419d5223ce"
-dependencies = [
- "futures-core",
- "pin-project-lite",
  "tokio",
 ]
 

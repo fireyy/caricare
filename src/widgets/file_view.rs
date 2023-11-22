@@ -4,7 +4,6 @@ use cc_storage::Object;
 use super::confirm::ConfirmAction;
 use super::toasts::ToastKind;
 use crate::global;
-use crate::util;
 use cc_ui::icon;
 
 #[derive(PartialEq)]
@@ -21,8 +20,6 @@ pub struct FileView {
     pub is_preview: bool,
     pub img_zoom: f32,
     pub img_default_zoom: f32,
-    pub img_scroll: Option<eframe::emath::Pos2>,
-    pub disp_rect: util::Rect,
 }
 
 impl FileView {
@@ -31,8 +28,6 @@ impl FileView {
             is_preview: false,
             img_zoom: 1.0,
             img_default_zoom: 1.0,
-            img_scroll: Some(eframe::emath::Pos2::new(0.0, 0.0)),
-            disp_rect: util::Rect::default(),
         }
     }
 
@@ -73,11 +68,26 @@ impl FileView {
                             .auto_shrink([false; 2])
                             .show(ui, |ui| {
                                 if !url.is_empty() {
+                                    let mut size: egui::Vec2 = egui::Vec2::ZERO;
                                     let mut image = egui::Image::from_uri(url);
-                                    image = image.fit_to_original_size(self.img_zoom);
-                                    if self.img_zoom == 1.0 {
-                                        image = image.max_size(ui.available_size());
+                                    if let Ok(img) =
+                                        image.load_for_size(ui.ctx(), ui.available_size())
+                                    {
+                                        if let Some(size2) = img.size() {
+                                            self.img_default_zoom =
+                                                if size2.x > ui.available_width() {
+                                                    ui.available_width() / size2.x
+                                                } else {
+                                                    1.0
+                                                };
+                                            size = size2;
+                                        }
                                     }
+                                    if self.img_zoom == 1.0 {
+                                        self.img_zoom = self.img_default_zoom;
+                                    }
+                                    size *= self.img_zoom;
+                                    image = image.fit_to_exact_size(size);
                                     ui.add_sized(ui.available_size(), image);
                                 }
                             });
@@ -128,7 +138,7 @@ impl FileView {
                             .on_hover_text("Zoom to window size")
                             .clicked()
                         {
-                            self.img_zoom = 1.0;
+                            self.img_zoom = self.img_default_zoom;
                         }
                         if ui
                             .button(icon::ZOOM_OUT)
@@ -219,11 +229,3 @@ impl FileView {
         self.is_preview = true;
     }
 }
-
-// pub fn create_image(ctx: &egui::Context, buf: &Buffer) -> TextureHandle {
-//     let (size, pixels) =
-//         buf.render_to_rgba(Rectangle::from(0, 0, buf.get_width(), buf.get_height()));
-//     let color_image =
-//         ColorImage::from_rgba_premultiplied([size.width as usize, size.height as usize], &pixels);
-//     ctx.load_texture("my_texture", color_image, TextureOptions::NEAREST)
-// }
