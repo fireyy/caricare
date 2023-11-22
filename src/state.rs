@@ -6,7 +6,8 @@ use crate::widgets::{
 };
 use crate::{spawn_evs, spawn_transfer};
 use cc_core::{log::LogItem, store, tracing, MemoryHistory, Session, Setting};
-use cc_files::Cache as ImageCache;
+use cc_files::{Cache as ImageCache, FileType};
+
 use cc_storage::util::get_name_form_path;
 use cc_storage::{
     Bucket, Client, ListObjects, Metadata, Object, Params, Result as ClientResult, TransferManager,
@@ -50,11 +51,11 @@ pub enum Update {
     TransferResult,
     List(ClientResult<ListObjects>),
     Navgator(NavgatorType),
-    Deleted(ClientResult<()>),
-    CreateFolder(ClientResult<()>),
+    Deleted(ClientResult<bool>),
+    CreateFolder(ClientResult<bool>),
     ViewObject(Object),
     CloseObject,
-    HeadObject(ClientResult<Metadata>),
+    HeadObject(ClientResult<(Metadata, Vec<u8>)>),
     GetObject(ClientResult<(String, Vec<u8>)>),
     BucketInfo(ClientResult<Bucket>),
     Copied(ClientResult<(String, bool)>),
@@ -110,9 +111,8 @@ impl State {
 
         let mut current_path = String::from("");
         let navigator = MemoryHistory::new();
-        let ctx_clone = ctx.clone();
 
-        let images = ImageCache::create(move || ctx_clone.request_repaint());
+        let images = ImageCache::create();
 
         let mut status = Status::Idle(Route::List);
 
@@ -183,7 +183,6 @@ impl State {
     }
 
     pub fn init(&mut self, ctx: &egui::Context) {
-        self.file_cache.poll();
         self.init_confirm(ctx);
         let ctx_clone = ctx.clone();
         self.transfer_manager
@@ -230,9 +229,12 @@ impl State {
                     self.refresh();
                 }
                 Update::Deleted(result) => match result {
-                    Ok(_) => {
-                        //
-                        self.refresh();
+                    Ok(success) => {
+                        if success {
+                            self.refresh();
+                        } else {
+                            self.toasts.error("Delete failed.");
+                        }
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -241,9 +243,12 @@ impl State {
                     }
                 },
                 Update::CreateFolder(result) => match result {
-                    Ok(_) => {
-                        //
-                        self.refresh();
+                    Ok(success) => {
+                        if success {
+                            self.refresh();
+                        } else {
+                            self.toasts.error("Create failed.");
+                        }
                     }
                     Err(err) => {
                         self.status = Status::Idle(Route::List);
@@ -269,17 +274,31 @@ impl State {
                     }
                 },
                 Update::HeadObject(result) => match result {
-                    Ok(headers) => {
+                    Ok((headers, data)) => {
                         tracing::debug!(
-                            "current: {:?} {}",
+                            "current: {:?} {} {:?}",
                             self.current_object,
-                            headers.content_length()
+                            headers.content_length(),
+                            &data[..data.len().min(128)]
                         );
-                        if let Some(mint_type) = headers.content_type() {
-                            self.current_object.set_mine_type(mint_type.to_string());
+                        let data_clone = data.clone();
+                        if let Some(mime_type) = headers.content_type() {
+                            tracing::debug!("Mime Type1: {:?}", mime_type);
+                            self.current_object.set_mine_type(mime_type.to_string());
+                        }
+                        if let Some(mime_type) = FileType::guess_type(data) {
+                            tracing::debug!("Mime Type2: {:?}", mime_type);
+                            self.current_object
+                                .set_mine_type(mime_type.mime_type().to_string());
                         }
                         if headers.content_length() <= MAX_BUFFER_SIZE {
-                            self.get_current_object();
+                            if self.current_object.mine_type().starts_with("image/") {
+                                // do nothing
+                                self.get_signature_url(self.current_object.key().to_string(), 3600);
+                                self.file_cache.add(self.current_object.key(), data_clone);
+                            } else {
+                                self.get_current_object();
+                            }
                         } else {
                             self.file_cache.big_file(self.current_object.key());
                         }

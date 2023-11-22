@@ -9,6 +9,7 @@ pub struct App {
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         Globals::new(&cc.egui_ctx);
+        egui_extras::install_image_loaders(&cc.egui_ctx);
         let state = State::new(&cc.egui_ctx);
         let mut this = Self { state };
 

@@ -66,13 +66,23 @@ impl Client {
         Ok(Bucket::new(self.config.bucket.to_owned(), grant))
     }
 
-    pub async fn head_object(&self, object: impl AsRef<str>) -> Result<Metadata> {
+    pub async fn meta_data(&self, object: impl AsRef<str>) -> Result<Metadata> {
         let object = object.as_ref();
         let meta = self.operator.stat(object).await?;
 
         tracing::debug!("Response header: {:?}", meta);
 
         Ok(meta)
+    }
+
+    pub async fn head_object(&self, object: impl AsRef<str>) -> Result<(Metadata, Vec<u8>)> {
+        let object = object.as_ref();
+        let meta = self.operator.stat(object).await?;
+        let result = self.operator.read_with(object).range(0..256).await?;
+
+        tracing::debug!("Response header: {:?}", meta);
+
+        Ok((meta, result))
     }
 
     pub async fn get_object(&self, object: impl AsRef<str>) -> Result<(String, Vec<u8>)> {
@@ -89,15 +99,15 @@ impl Client {
         Ok((object.to_string(), result))
     }
 
-    pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<()> {
+    pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<bool> {
         let object = object.as_ref();
         self.operator.delete(object).await?;
-        // TODO: check `object` if delete success
+        let result = self.operator.is_exist(&object).await?;
 
-        Ok(())
+        Ok(result)
     }
 
-    pub async fn delete_multi_object(self, obj: Vec<Object>) -> Result<()> {
+    pub async fn delete_multi_object(self, obj: Vec<Object>) -> Result<bool> {
         let mut paths: Vec<String> = vec![];
 
         for o in obj.iter() {
@@ -107,7 +117,7 @@ impl Client {
         self.operator.remove(paths).await?;
         // TODO: check delete result
 
-        Ok(())
+        Ok(true)
     }
 
     pub async fn list_v2(&self, query: Option<String>) -> Result<ListObjects> {
@@ -144,7 +154,7 @@ impl Client {
         Ok(list_objects)
     }
 
-    pub async fn create_folder(&self, path: String) -> Result<()> {
+    pub async fn create_folder(&self, path: String) -> Result<bool> {
         let path = if path.ends_with('/') {
             path
         } else {
@@ -153,9 +163,9 @@ impl Client {
         tracing::debug!("Create folder: {}", path);
 
         self.operator.create_dir(&path).await?;
-        // TODO: use `stat` to check create dir result
+        let result = self.operator.is_exist(&path).await?;
 
-        Ok(())
+        Ok(result)
     }
 
     pub async fn copy_object(
@@ -197,7 +207,7 @@ impl Client {
             None => self.operator.reader(path).await?,
         };
 
-        let size = self.head_object(path).await?.content_length();
+        let size = self.meta_data(path).await?.content_length();
         let mut body = Vec::new();
 
         let mut stream = reader.into_async_read().report_progress(|bytes_read| {

@@ -8,7 +8,7 @@ pub(crate) fn create(config: &Arc<ClientConfig>) -> Result<Operator> {
     let mut builder = S3::default();
     builder.bucket(&config.bucket);
     builder.endpoint(&config.endpoint);
-    builder.region("auto");
+    builder.region("us-east-1");
     builder.access_key_id(&config.access_key_id);
     builder.secret_access_key(&config.access_key_secret);
     builder.disable_config_load();
