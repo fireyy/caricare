@@ -56,7 +56,7 @@ impl Confirm {
                     }
                     ui.painter().rect_filled(
                         screen_rect,
-                        egui::Rounding::none(),
+                        egui::Rounding::ZERO,
                         egui::Color32::from_rgba_premultiplied(0, 0, 0, 200),
                     );
                 });
