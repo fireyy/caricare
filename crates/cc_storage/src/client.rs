@@ -130,9 +130,7 @@ impl Client {
             .metakey(Metakey::Mode | Metakey::ContentLength | Metakey::LastModified)
             .await?;
 
-        let mut list_objects = ListObjects::default();
-        let mut common_prefixes = Vec::new();
-        let mut objects = Vec::new();
+        let (mut common_prefixes, mut objects) = (vec![], vec![]);
 
         while let Some(entry) = stream.try_next().await? {
             let meta = entry.metadata();
@@ -148,6 +146,7 @@ impl Client {
             }
         }
 
+        let mut list_objects = ListObjects::default();
         list_objects.set_common_prefixes(common_prefixes);
         list_objects.set_objects(objects);
 
