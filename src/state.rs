@@ -231,6 +231,7 @@ impl State {
                 Update::Deleted(result) => match result {
                     Ok(success) => {
                         if success {
+                            tracing::debug!("Delete success.");
                             self.refresh();
                         } else {
                             self.toasts.error("Delete failed.");

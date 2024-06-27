@@ -1,22 +1,22 @@
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::config::ClientConfig;
-use crate::partial_file::PartialFile;
 use crate::transfer::{TransferProgressInfo, TransferSender, TransferType};
 use crate::types::{Bucket, ListObjects, Object, Params};
 use crate::util::get_name;
 use crate::Result;
-use anyhow::Context;
 use cc_core::ServiceType;
+use futures::TryStreamExt;
 
 use crate::services;
-use crate::stream::{
-    AsyncReadProgressExt, BoxedStreamingUploader, StreamingUploader, TrackableBodyStream,
-};
-use futures::{AsyncReadExt, TryStreamExt};
 use opendal::{Metadata, Metakey, Operator};
+use tokio::{
+    fs,
+    io::{self, AsyncWriteExt as _},
+};
+
+const DEFAULT_BUF_SIZE: usize = 8 * 1024 * 1024;
 
 #[derive(Clone)]
 pub struct Client {
@@ -82,29 +82,29 @@ impl Client {
 
         tracing::debug!("Response header: {:?}", meta);
 
-        Ok((meta, result))
+        Ok((meta, result.to_vec()))
     }
 
     pub async fn get_object(&self, object: impl AsRef<str>) -> Result<(String, Vec<u8>)> {
         let object = object.as_ref();
         let result = self.operator.read(object).await?;
 
-        Ok((object.to_string(), result))
+        Ok((object.to_string(), result.to_vec()))
     }
 
     pub async fn get_object_range(&self, object: impl AsRef<str>) -> Result<(String, Vec<u8>)> {
         let object = object.as_ref();
         let result = self.operator.read_with(object).range(..128).await?;
 
-        Ok((object.to_string(), result))
+        Ok((object.to_string(), result.to_vec()))
     }
 
     pub async fn delete_object(&self, object: impl AsRef<str>) -> Result<bool> {
         let object = object.as_ref();
         self.operator.delete(object).await?;
-        let result = self.operator.is_exist(object).await?;
+        // let result = self.operator.is_exist(object).await?;
 
-        Ok(result)
+        Ok(true)
     }
 
     pub async fn delete_multi_object(self, obj: Vec<Object>) -> Result<bool> {
@@ -183,67 +183,36 @@ impl Client {
         Ok((src.to_string(), is_move))
     }
 
-    fn streaming_upload(&self, path: &str) -> Result<BoxedStreamingUploader> {
-        Ok(Box::new(StreamingUploader::new(
-            self.operator.clone(),
-            path.to_string(),
-        )))
-    }
-
-    async fn streaming_read(
-        &self,
-        path: &str,
-        start_pos: Option<usize>,
-        transfer: TransferSender,
-    ) -> Result<Vec<u8>> {
-        let reader = match start_pos {
-            Some(start_position) => {
-                self.operator
-                    .reader_with(path)
-                    .range(start_position as u64..)
-                    .await?
-            }
-            None => self.operator.reader(path).await?,
-        };
-
-        let size = self.meta_data(path).await?.content_length();
-        let mut body = Vec::new();
-
-        let mut stream = reader.into_async_read().report_progress(|bytes_read| {
-            transfer
-                .send(TransferType::Download(
-                    path.to_string(),
-                    TransferProgressInfo {
-                        total_bytes: size,
-                        transferred_bytes: bytes_read as u64,
-                    },
-                ))
-                .unwrap();
-        });
-
-        stream
-            .read_to_end(&mut body)
-            .await
-            .context("failed to read object content into buffer")?;
-
-        Ok(body)
-    }
-
     pub async fn download_file(
         &self,
         obj: &str,
         target: PathBuf,
         transfer: TransferSender,
     ) -> Result<()> {
-        let mut new_file = PartialFile::create(&target)
-            .with_context(|| format!("create `{}`", target.display()))?;
+        let remote_op = self.operator.clone();
+        let progress_tx = transfer.clone();
+        let oid = obj.to_string();
+        let total_bytes = self.meta_data(obj).await?.content_length();
 
-        let content = self.streaming_read(obj, None, transfer).await?;
-
-        new_file
-            .write_all(&content)
-            .context("write content of file")?;
-        new_file.finish().context("finish writing to new file")?;
+        tokio::spawn(async move {
+            let _: Result<Option<String>> = async {
+                fs::create_dir_all(target.parent().unwrap()).await?;
+                let mut reader = remote_op.reader_with(&oid).buffer(DEFAULT_BUF_SIZE).await?;
+                let mut writer = io::BufWriter::new(fs::File::create(&target).await?);
+                copy_with_progress(
+                    "download",
+                    &progress_tx,
+                    &oid,
+                    total_bytes,
+                    &mut reader,
+                    &mut writer,
+                )
+                .await?;
+                writer.shutdown().await?;
+                Ok(Some(target.to_string_lossy().into()))
+            }
+            .await;
+        });
 
         Ok(())
     }
@@ -251,34 +220,29 @@ impl Client {
     pub async fn put(&self, path: PathBuf, dest: &str, transfer: &TransferSender) -> Result<()> {
         let name = get_name(&path);
         let key = format!("{dest}{name}");
-
-        let mut body = TrackableBodyStream::try_from(path)
-            .map_err(|e| {
-                panic!("Could not open sample file: {e}");
-            })
-            .unwrap();
+        let remote_op = self.operator.clone();
         let progress_tx = transfer.clone();
+        let total_bytes = fs::metadata(&path).await?.len();
 
-        body.set_callback(
-            &key,
-            move |key: &str, tot_size: u64, sent: u64, _cur_buf: u64| {
-                progress_tx
-                    .send(TransferType::Upload(
-                        key.to_string(),
-                        TransferProgressInfo {
-                            total_bytes: tot_size,
-                            transferred_bytes: sent,
-                        },
-                    ))
-                    .unwrap();
-            },
-        );
+        tokio::spawn(async move {
+            let _: Result<Option<String>> = async {
+                let mut reader = io::BufReader::new(fs::File::open(path).await?);
+                let mut writer = remote_op.writer_with(&key).buffer(DEFAULT_BUF_SIZE).await?;
+                copy_with_progress(
+                    "upload",
+                    &progress_tx,
+                    &key,
+                    total_bytes,
+                    &mut reader,
+                    &mut writer,
+                )
+                .await?;
+                writer.close().await?;
+                Ok(None)
+            }
+            .await;
+        });
 
-        let mut uploader = self.streaming_upload(&key)?;
-        while let Ok(Some(bytes)) = body.try_next().await {
-            uploader.write_bytes(bytes).await?;
-        }
-        uploader.finish().await?;
         // TODO: check if put success
 
         Ok(())
@@ -350,4 +314,54 @@ impl ClientBuilder {
     pub fn build(self) -> Result<Client> {
         Client::new(self.config)
     }
+}
+
+async fn copy_with_progress<R, W>(
+    tp: &str,
+    progress_sender: &TransferSender,
+    key: &str,
+    total_bytes: u64,
+    mut reader: R,
+    mut writer: W,
+) -> io::Result<usize>
+where
+    R: io::AsyncReadExt + Unpin,
+    W: io::AsyncWriteExt + Unpin,
+{
+    let mut bytes_so_far: usize = 0;
+    let mut buf = vec![0; DEFAULT_BUF_SIZE];
+
+    loop {
+        let bytes_since_last = reader.read(&mut buf).await?;
+        if bytes_since_last == 0 {
+            break;
+        }
+        writer.write_all(&buf[..bytes_since_last]).await?;
+        bytes_so_far += bytes_since_last;
+        let msg = if tp == "download" {
+            TransferType::Download(
+                key.to_string(),
+                TransferProgressInfo {
+                    total_bytes: total_bytes as usize,
+                    transferred_bytes: bytes_so_far,
+                },
+            )
+        } else {
+            TransferType::Upload(
+                key.to_string(),
+                TransferProgressInfo {
+                    total_bytes: total_bytes as usize,
+                    transferred_bytes: bytes_so_far,
+                },
+            )
+        };
+        send_response(progress_sender, msg).await;
+    }
+
+    Ok(bytes_so_far)
+}
+
+async fn send_response(sender: &TransferSender, msg: TransferType) {
+    // tracing::debug!("response: {}", &msg);
+    sender.send(msg).unwrap();
 }
