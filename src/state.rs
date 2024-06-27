@@ -99,10 +99,7 @@ pub struct State {
 
 impl State {
     pub fn new(ctx: &egui::Context) -> Self {
-        let session = match store::get_latest_session() {
-            Some(session) => session,
-            None => Session::default(),
-        };
+        let session = store::get_latest_session().unwrap_or_default();
 
         let mut client = None;
         let mut bucket = None;
@@ -577,7 +574,7 @@ impl State {
 
         store::put_session(&self.session)?;
         let current_path = "".to_string();
-        self.current_path = current_path.clone();
+        self.current_path.clone_from(&current_path);
         self.navigator.push(current_path);
         self.client = Some(client);
         self.get_bucket_info();

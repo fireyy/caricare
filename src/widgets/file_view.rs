@@ -207,7 +207,7 @@ impl FileView {
     }
 
     fn mouse_wheel_zoom(&mut self, delta: f32) {
-        let delta = zoomratio((delta / 10.).max(-5.0).min(5.0), self.img_zoom);
+        let delta = zoomratio((delta / 10.).clamp(-5.0, 5.0), self.img_zoom);
         let new_scale = self.img_zoom + delta;
         // limit scale
         if new_scale > 0.01 && new_scale < 40. {

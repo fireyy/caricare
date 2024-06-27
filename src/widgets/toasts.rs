@@ -167,7 +167,7 @@ impl Toasts {
             }
 
             if response.clicked() {
-                egui_ctx.output_mut(|o| o.copied_text = toast.text.clone());
+                egui_ctx.output_mut(|o| o.copied_text.clone_from(&toast.text));
                 toast.close();
             }
 
