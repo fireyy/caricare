@@ -16,5 +16,5 @@ pub use client::Client;
 pub use error::OSSError;
 pub use opendal::{Lister, Metadata};
 pub use transfer::TransferManager;
-pub use types::{Bucket, Headers, ListObjects, Object, ObjectType, Params};
+pub use types::{Bucket, Headers, ListObjects, ListObjectsV2Params, Object, ObjectType, Params};
 pub use version::VERSION;

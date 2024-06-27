@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use crate::config::ClientConfig;
 use crate::transfer::{TransferProgressInfo, TransferSender, TransferType};
-use crate::types::{Bucket, ListObjects, Object, Params};
+use crate::types::{Bucket, ListObjects, ListObjectsV2Params, Object, Params};
 use crate::util::get_name;
 use crate::Result;
 use cc_core::ServiceType;
-use futures::TryStreamExt;
+use futures::StreamExt;
 
 use crate::services;
 use opendal::{Metadata, Metakey, Operator};
@@ -120,21 +120,31 @@ impl Client {
         Ok(true)
     }
 
-    pub async fn list_v2(&self, query: Option<String>) -> Result<ListObjects> {
+    pub async fn list_v2(&self, query: ListObjectsV2Params) -> Result<ListObjects> {
         tracing::debug!("List object: {:?}", query);
-        let path = query.map_or("".into(), |x| format!("{x}/"));
+        // let path = query.prefix.map_or("".into(), |x| format!("{x}/"));
+        let mut path = query.prefix;
+        if !path.is_empty() && !path.ends_with('/') {
+            path.push('/');
+        }
         //TODO 分页功能
         let mut stream = self
             .operator
             .lister_with(&path)
+            .start_after(&query.start_after)
             .metakey(Metakey::Mode | Metakey::ContentLength | Metakey::LastModified)
-            .await?;
+            .await?
+            .chunks(100);
 
         let (mut common_prefixes, mut objects) = (vec![], vec![]);
 
-        while let Some(entry) = stream.try_next().await? {
-            let meta = entry.metadata();
+        let page = stream.next().await.unwrap_or_default();
 
+        let is_truncated = page.len() >= 100;
+
+        for v in page {
+            let entry = v?;
+            let meta = entry.metadata();
             if meta.is_dir() {
                 common_prefixes.push(Object::new_folder(entry.path()));
             } else {
@@ -147,6 +157,12 @@ impl Client {
         }
 
         let mut list_objects = ListObjects::default();
+        list_objects.set_start_after(if objects.is_empty() {
+            common_prefixes.last().unwrap().key().to_owned()
+        } else {
+            objects.last().unwrap().key().to_owned()
+        });
+        list_objects.set_is_truncated(is_truncated);
         list_objects.set_common_prefixes(common_prefixes);
         list_objects.set_objects(objects);
 

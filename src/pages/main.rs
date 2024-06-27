@@ -102,7 +102,7 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
                 //     max_scroll,
                 // );
 
-                if state.next_query.is_some()
+                if state.next_query.is_truncated
                     && current_scroll + 20.0 >= max_scroll
                     && !state.loading_more
                 {

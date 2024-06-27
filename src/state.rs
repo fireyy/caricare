@@ -10,7 +10,8 @@ use cc_files::{Cache as ImageCache, FileType};
 
 use cc_storage::util::get_name_form_path;
 use cc_storage::{
-    Bucket, Client, ListObjects, Metadata, Object, Params, Result as ClientResult, TransferManager,
+    Bucket, Client, ListObjects, ListObjectsV2Params, Metadata, Object, Params,
+    Result as ClientResult, TransferManager,
 };
 use std::{path::PathBuf, vec};
 
@@ -74,7 +75,7 @@ pub struct State {
     pub setting: Setting,
     pub file_view: FileView,
     pub loading_more: bool,
-    pub next_query: Option<Params>,
+    pub next_query: ListObjectsV2Params,
     pub scroll_top: bool,
     pub file_cache: ImageCache,
     pub logs: Vec<LogItem>,
@@ -147,7 +148,7 @@ impl State {
             err: None,
             file_view: FileView::new(),
             loading_more: false,
-            next_query: None,
+            next_query: ListObjectsV2Params::default(),
             scroll_top: false,
             file_cache: images,
             logs: vec![],
@@ -169,7 +170,7 @@ impl State {
             transfer_manager: TransferManager::new(),
         };
 
-        this.next_query = Some(this.build_query(None));
+        // this.next_query = Some(this.build_query(None));
         this.sessions = this.load_all_session();
 
         if is_need_init {
@@ -192,11 +193,14 @@ impl State {
                 }
                 Update::List(result) => match result {
                     Ok(str) => {
-                        if let Some(token) = str.next_continuation_token() {
-                            self.next_query = Some(self.build_query(Some(token.clone())));
-                        } else {
-                            self.next_query = None;
-                        }
+                        // if let Some(token) = str.next_continuation_token() {
+                        //     self.next_query = Some(self.build_query(Some(token.clone())));
+                        // } else {
+                        //     self.next_query = None;
+                        // }
+                        self.next_query.start_after = str.start_after().to_string();
+                        self.next_query.prefix = str.prefix().to_string();
+                        self.next_query.is_truncated = str.is_truncated();
                         self.set_list(str);
                         self.loading_more = false;
                         self.status = Status::Idle(Route::List);
@@ -495,19 +499,17 @@ impl State {
     }
 
     pub fn get_list(&mut self) {
-        if let Some(_query) = &self.next_query {
-            if !self.loading_more {
-                self.status = Status::Busy(Route::List);
-            }
-
-            let query = self.current_path.clone();
-
-            spawn_evs!(self, |evs, client, ctx| {
-                let res = client.list_v2(Some(query)).await;
-                evs.send(Update::List(res)).unwrap();
-                ctx.request_repaint();
-            });
+        if !self.loading_more {
+            self.status = Status::Busy(Route::List);
         }
+
+        let query = self.next_query.clone();
+
+        spawn_evs!(self, |evs, client, ctx| {
+            let res = client.list_v2(query).await;
+            evs.send(Update::List(res)).unwrap();
+            ctx.request_repaint();
+        });
     }
 
     pub fn set_list(&mut self, obj: ListObjects) {
@@ -523,7 +525,7 @@ impl State {
 
     pub fn load_more(&mut self) {
         tracing::debug!("load more!");
-        if self.next_query.is_some() {
+        if self.next_query.is_truncated {
             self.get_list();
         } else {
             //no more
@@ -535,7 +537,7 @@ impl State {
         self.scroll_top = true;
         let current_path = self.navigator.location();
         self.current_path = current_path;
-        self.next_query = Some(self.build_query(None));
+        self.next_query = ListObjectsV2Params::default();
         self.list = vec![];
         self.get_list();
     }
@@ -544,7 +546,7 @@ impl State {
         self.refresh();
     }
 
-    fn build_query(&self, next_token: Option<String>) -> Params {
+    fn _build_query(&self, next_token: Option<String>) -> Params {
         let mut path = self.current_path.clone();
         if !path.ends_with('/') && !path.is_empty() {
             path.push('/');
