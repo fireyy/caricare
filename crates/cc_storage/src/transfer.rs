@@ -5,8 +5,8 @@ pub type TransferSender = crossbeam_channel::Sender<TransferType>;
 
 #[derive(Clone, Default, Debug)]
 pub struct TransferProgressInfo {
-    pub total_bytes: u64,
-    pub transferred_bytes: u64,
+    pub total_bytes: usize,
+    pub transferred_bytes: usize,
 }
 
 impl TransferProgressInfo {
@@ -92,7 +92,11 @@ impl TransferManager {
     }
 
     fn update_download(&mut self, key: String, item: TransferProgressInfo) {
-        // tracing::debug!("Download `{key}`… {}/{}", item.current, item.total);
+        tracing::debug!(
+            "Download `{key}`… {}/{}",
+            item.transferred_bytes,
+            item.total_bytes
+        );
         if item.transferred_bytes == item.total_bytes {
             tracing::debug!("Download Done!");
         }
@@ -100,7 +104,11 @@ impl TransferManager {
     }
 
     fn update_upload(&mut self, key: String, item: TransferProgressInfo) {
-        // tracing::debug!("Upload `{key}`… {}/{}", item.current, item.total);
+        tracing::debug!(
+            "Upload `{key}`… {}/{}",
+            item.transferred_bytes,
+            item.total_bytes
+        );
         if item.transferred_bytes == item.total_bytes {
             tracing::debug!("Upload Done!");
         }

@@ -29,7 +29,7 @@ pub fn status_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe
                     ui.add(egui::Spinner::new().size(12.0));
                 }
 
-                if state.next_query.is_none() && !state.loading_more {
+                if !state.next_query.is_truncated && !state.loading_more {
                     // ui.label("No More Data.");
                 }
 

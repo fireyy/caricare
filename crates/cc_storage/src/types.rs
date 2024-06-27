@@ -56,12 +56,20 @@ impl ListObjects {
         &self.start_after
     }
 
+    pub fn set_start_after(&mut self, start_after: String) {
+        self.start_after = start_after;
+    }
+
     pub fn max_keys(&self) -> &str {
         &self.max_keys
     }
 
     pub fn is_truncated(&self) -> bool {
         self.is_truncated
+    }
+
+    pub fn set_is_truncated(&mut self, is_truncated: bool) {
+        self.is_truncated = is_truncated;
     }
 
     pub fn next_continuation_token(&self) -> &Option<String> {
@@ -237,6 +245,23 @@ impl Bucket {
             "public-read" => BucketACL::PublicRead,
             "private" => BucketACL::Private,
             _ => BucketACL::Private,
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ListObjectsV2Params {
+    pub prefix: String,
+    pub start_after: String,
+    pub is_truncated: bool,
+}
+
+impl ListObjectsV2Params {
+    pub fn new(prefix: String, start_after: String, is_truncated: bool) -> Self {
+        ListObjectsV2Params {
+            prefix,
+            start_after,
+            is_truncated,
         }
     }
 }

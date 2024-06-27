@@ -8,5 +8,3 @@ pub enum OSSError {
     #[error("{0}")]
     WithDescription(String),
 }
-
-pub type ObjectResult<T> = std::result::Result<T, anyhow::Error>;

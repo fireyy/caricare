@@ -7,7 +7,12 @@ description = "A simple cross-platform desktop application for S3-Compatible Obj
 [package.metadata.bundle]
 name = "Caricare"
 identifier = "com.fireyy.caricare"
-icon = ["icons/Icon.icns", "icons/Icon.iconset/icon-256.png", "icons/Icon.iconset/icon-32.png", "icons/Icon.iconset/icon-16.png"]
+icon = [
+    "icons/Icon.icns",
+    "icons/Icon.iconset/icon-256.png",
+    "icons/Icon.iconset/icon-32.png",
+    "icons/Icon.iconset/icon-16.png",
+]
 version = "1.0.0"
 copyright = "Copyright (c) Fireyy (2023). All rights reserved."
 category = "Developer Tool"
@@ -15,17 +20,7 @@ short_description = "A simple cross-platform desktop application for S3-Compatib
 osx_minimum_system_version = "10.12"
 
 [features]
-default = ["services-s3-compatible"]
-# Enable Amazon Simple Storage Service support
-services-s3 = ["cc_storage/services-s3"]
-# Enable Aliyun Object Storage Service support
-services-oss = ["cc_storage/services-oss"]
-# Enable Google Cloud Storage support
-services-gcs = ["cc_storage/services-gcs"]
-# Enable Azure Blob Storage support
-services-azblob = ["cc_storage/services-azblob"]
-# Enable S3-Compatible Object Storage support
-services-s3-compatible = ["cc_storage/services-s3-compatible"]
+default = []
 # Enable CJK char support
 lang-cjk = ["cc_ui/lang-cjk"]
 
@@ -38,7 +33,12 @@ serde = { workspace = true }
 egui = { workspace = true }
 cc_files = { workspace = true }
 egui_extras = { workspace = true }
-image = { version = "0.24.6", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+image = { version = "0.24.6", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+    "webp",
+] }
 rfd = "0.10"
 egui-notify = "0.6"
 tracing = { workspace = true }
@@ -48,9 +48,7 @@ once_cell = { workspace = true }
 
 [workspace]
 resolver = "2"
-members = [
-    "crates/*",
-]
+members = ["crates/*"]
 
 [workspace.package]
 authors = ["fireyy zhu <fireyy@gmail.com>"]
