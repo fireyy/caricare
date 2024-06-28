@@ -24,8 +24,8 @@ pub fn thumb_item_ui(ui: &mut egui::Ui, data: &mut Object, is_current: bool) -> 
         }
         ui.allocate_ui_at_rect(rect, |ui| {
             egui::Frame {
-                inner_margin: egui::style::Margin::same(5.0),
-                outer_margin: egui::style::Margin::same(0.0),
+                inner_margin: egui::Margin::same(5.0),
+                outer_margin: egui::Margin::same(0.0),
                 fill: fill_color,
                 ..egui::Frame::default()
             }

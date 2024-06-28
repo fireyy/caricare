@@ -7,7 +7,7 @@ use egui_extras::{Column, TableBuilder};
 pub fn auth_page(ctx: &egui::Context, state: &mut State) {
     egui::CentralPanel::default().show(ctx, |ui| {
         egui::Frame::none()
-            .inner_margin(egui::style::Margin::symmetric(0.0, 20.0))
+            .inner_margin(egui::Margin::symmetric(0.0, 20.0))
             .show(ui, |ui| {
                 egui::Grid::new("auth_form_grid")
                     .spacing([10.0; 2])
@@ -93,7 +93,8 @@ pub fn auth_page(ctx: &egui::Context, state: &mut State) {
                     })
                     .body(|body| {
                         let sessions = state.sessions.clone();
-                        body.rows(text_height, state.sessions.len(), |row_index, mut row| {
+                        body.rows(text_height, state.sessions.len(), |mut row| {
+                            let row_index = row.index();
                             let d = sessions.get(row_index).unwrap();
                             row.col(|ui| {
                                 ui.label(&d.key_id);

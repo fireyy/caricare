@@ -3,7 +3,7 @@ use crate::state::Update;
 use crate::widgets::confirm::ConfirmAction;
 use cc_storage::Object;
 use cc_ui::icon;
-use egui::{self, style::Margin, vec2, Color32, Frame, Sense, WidgetInfo, WidgetType};
+use egui::{self, vec2, Color32, Frame, Margin, Sense, WidgetInfo, WidgetType};
 
 pub fn list_item_ui(ui: &mut egui::Ui, data: &mut Object, is_current: bool) -> egui::Response {
     let row_height = ui.text_style_height(&egui::TextStyle::Body);

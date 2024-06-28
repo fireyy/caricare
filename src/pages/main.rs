@@ -11,7 +11,7 @@ pub fn main_page(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Fra
     top_bar_ui(ctx, state, frame);
     egui::CentralPanel::default().show(ctx, |ui| {
         egui::Frame::none()
-            .inner_margin(egui::style::Margin::same(0.0))
+            .inner_margin(egui::Margin::same(0.0))
             .show(ui, |ui| {
                 if let Status::Busy(_) = state.status {
                     ui.centered_and_justified(|ui| {
