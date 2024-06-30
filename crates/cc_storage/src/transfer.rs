@@ -5,8 +5,8 @@ pub type TransferSender = crossbeam_channel::Sender<TransferType>;
 
 #[derive(Clone, Default, Debug)]
 pub struct TransferProgressInfo {
-    pub total_bytes: usize,
-    pub transferred_bytes: usize,
+    pub total_bytes: u64,
+    pub transferred_bytes: u64,
 }
 
 impl TransferProgressInfo {
