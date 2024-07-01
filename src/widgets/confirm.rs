@@ -44,7 +44,7 @@ impl Confirm {
 
     pub fn init(&mut self, ctx: &egui::Context) {
         if self.is_show {
-            egui::Area::new("confirm_mask")
+            egui::Area::new(egui::Id::new("confirm_mask"))
                 .interactable(true)
                 .fixed_pos(egui::Pos2::ZERO)
                 .show(ctx, |ui| {

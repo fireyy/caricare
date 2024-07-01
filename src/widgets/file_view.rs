@@ -62,7 +62,7 @@ impl FileView {
                 if let Some(file) = current_file {
                     if file.is_image() {
                         is_image = true;
-                        ui.spacing_mut().scroll_bar_inner_margin = 0.0;
+                        ui.spacing_mut().scroll.bar_inner_margin = 0.0;
                         let resp = egui::ScrollArea::both()
                             .max_height(win_size.y - 110.0)
                             .auto_shrink([false; 2])

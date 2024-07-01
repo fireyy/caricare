@@ -112,7 +112,7 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
 
     egui_style.visuals.button_frame = true;
     egui_style.visuals.widgets.inactive.weak_bg_fill = Default::default(); // Buttons have no background color when inactive
-    egui_style.visuals.widgets.inactive.bg_fill = Color32::from_gray(40);
+    egui_style.visuals.widgets.inactive.bg_fill = Color32::from_gray(50);
 
     {
         // Background colors for buttons (menu buttons, blueprint buttons, etc) when hovered or clicked:
@@ -177,13 +177,18 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
     egui_style.spacing.button_padding = egui::Vec2::new(1.0, 0.0); // Makes the icons in the blueprint panel align
     egui_style.spacing.indent = 14.0; // From figma
 
-    egui_style.debug.show_blocking_widget = false; // turn this on to debug interaction problems
-
     egui_style.spacing.combo_width = 8.0; // minium width of ComboBox - keep them small, with the down-arrow close.
 
-    egui_style.spacing.scroll_bar_inner_margin = 2.0;
-    egui_style.spacing.scroll_bar_width = 6.0;
-    egui_style.spacing.scroll_bar_outer_margin = 2.0;
+    egui_style.spacing.scroll.bar_inner_margin = 2.0;
+    egui_style.spacing.scroll.bar_width = 6.0;
+    egui_style.spacing.scroll.bar_outer_margin = 2.0;
+
+    egui_style.spacing.tooltip_width = 720.0;
+
+    // don't color hyperlinks #2733
+    egui_style.visuals.hyperlink_color = default;
+
+    egui_style.visuals.image_loading_spinners = false;
 
     ctx.set_style(egui_style);
 

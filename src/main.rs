@@ -16,19 +16,21 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "Caricare",
         eframe::NativeOptions {
-            drag_and_drop_support: true,
-            initial_window_size: Some([900.0, 450.0].into()),
-            default_theme: eframe::Theme::Dark,
-            min_window_size: Some([600.0, 450.0].into()),
-            #[cfg(target_os = "macos")]
-            fullsize_content: true,
-
-            // Maybe hide the OS-specific "chrome" around the window:
-            decorated: !cc_ui::CUSTOM_WINDOW_DECORATIONS,
-            // To have rounded corners we need transparency:
-            transparent: cc_ui::CUSTOM_WINDOW_DECORATIONS,
-
+            viewport: egui::ViewportBuilder::default()
+                .with_app_id("caricare")
+                .with_icon(icon_data())
+                .with_drag_and_drop(true)
+                .with_min_inner_size([900.0, 450.0])
+                .with_inner_size([900.0, 450.0])
+                .with_decorations(!cc_ui::CUSTOM_WINDOW_DECORATIONS) // Maybe hide the OS-specific "chrome" around the window
+                .with_fullsize_content_view(cc_ui::FULLSIZE_CONTENT)
+                .with_inner_size([1200.0, 800.0])
+                .with_title_shown(!cc_ui::FULLSIZE_CONTENT)
+                .with_titlebar_buttons_shown(!cc_ui::CUSTOM_WINDOW_DECORATIONS)
+                .with_titlebar_shown(!cc_ui::FULLSIZE_CONTENT)
+                .with_transparent(cc_ui::CUSTOM_WINDOW_DECORATIONS), // To have rounded corners without decorations we need transparency
             follow_system_theme: false,
+            default_theme: eframe::Theme::Dark,
             ..Default::default()
         },
         Box::new(|cc: &eframe::CreationContext| Box::new(App::new(cc))),
@@ -37,6 +39,26 @@ fn main() -> Result<(), eframe::Error> {
     wait_for_shutdown();
 
     Ok(())
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn icon_data() -> egui::IconData {
+    let app_icon_png_bytes = include_bytes!("../icons/icon.png");
+
+    // We include the .png with `include_bytes`. If that fails, things are extremely broken.
+    match eframe::icon_data::from_png_bytes(app_icon_png_bytes) {
+        Ok(icon_data) => icon_data,
+        Err(err) => {
+            #[cfg(debug_assertions)]
+            panic!("Failed to load app icon: {err}");
+
+            #[cfg(not(debug_assertions))]
+            {
+                tracing::warn!("Failed to load app icon: {err}");
+                Default::default()
+            }
+        }
+    }
 }
 
 macro_rules! spawn_evs {

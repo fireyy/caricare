@@ -6,19 +6,15 @@ use cc_core::ShowType;
 use cc_storage::util::get_name_form_path;
 use cc_ui::icon;
 
-pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, frame: &mut eframe::Frame) {
-    let native_pixels_per_point = frame.info().native_pixels_per_point;
-    let fullscreen = frame.info().window_info.fullscreen;
-    let top_bar_style = global()
-        .cc_ui
-        .top_bar_style(native_pixels_per_point, fullscreen);
+pub fn top_bar_ui(ctx: &egui::Context, state: &mut State, _frame: &mut eframe::Frame) {
+    let top_bar_style = global().cc_ui.top_bar_style(false);
 
     egui::TopBottomPanel::top("top_bar")
         .frame(global().cc_ui.top_panel_frame())
         .exact_height(top_bar_style.height)
         .show(ctx, |ui| {
             egui::Frame::none()
-                .inner_margin(egui::style::Margin::symmetric(0.0, 5.0))
+                .inner_margin(egui::Margin::symmetric(0.0, 5.0))
                 .show(ui, |ui| {
                     ui.horizontal_wrapped(|ui| {
                         ui.add_space(top_bar_style.indent);

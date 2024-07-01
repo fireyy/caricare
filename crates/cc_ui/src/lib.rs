@@ -4,6 +4,8 @@ pub mod icon;
 use design_tokens::DesignTokens;
 use eframe::epaint::text::{LayoutJob, TextWrapping};
 
+pub const FULLSIZE_CONTENT: bool = cfg!(target_os = "macos");
+
 pub const CUSTOM_WINDOW_DECORATIONS: bool = false;
 
 pub static THUMB_LIST_WIDTH: f32 = 200.0;
@@ -120,23 +122,20 @@ impl CCUi {
         frame
     }
 
-    pub fn top_bar_style(
-        &self,
-        native_pixels_per_point: Option<f32>,
-        fullscreen: bool,
-    ) -> TopBarStyle {
-        let gui_zoom = if let Some(native_pixels_per_point) = native_pixels_per_point {
-            native_pixels_per_point / self.egui_ctx.pixels_per_point()
-        } else {
-            1.0
-        };
+    pub fn top_bar_style(&self, style_like_web: bool) -> TopBarStyle {
+        let egui_zoom_factor = self.egui_ctx.zoom_factor();
+
+        let fullscreen = self
+            .egui_ctx
+            .input(|i| i.viewport().fullscreen)
+            .unwrap_or(false);
 
         // On Mac, we share the same space as the native red/yellow/green close/minimize/maximize buttons.
         // This means we need to make room for them.
-        let make_room_for_window_buttons = {
+        let make_room_for_window_buttons = !style_like_web && {
             #[cfg(target_os = "macos")]
             {
-                !fullscreen
+                crate::FULLSIZE_CONTENT && !fullscreen
             }
             #[cfg(not(target_os = "macos"))]
             {
@@ -149,19 +148,20 @@ impl CCUi {
 
         let height = if make_room_for_window_buttons {
             // On mac we want to match the height of the native red/yellow/green close/minimize/maximize buttons.
+            // TODO(emilk): move the native window buttons to match our Self::title_bar_height
 
             // Use more vertical space when zoomed in…
             let height = native_buttons_size_in_native_scale.y;
 
             // …but never shrink below the native button height when zoomed out.
-            height.max(gui_zoom * native_buttons_size_in_native_scale.y)
+            height.max(native_buttons_size_in_native_scale.y / egui_zoom_factor)
         } else {
             Self::top_bar_height() - Self::top_bar_margin().sum().y
         };
 
         let indent = if make_room_for_window_buttons {
             // Always use the same width measured in native GUI coordinates:
-            gui_zoom * native_buttons_size_in_native_scale.x
+            native_buttons_size_in_native_scale.x / egui_zoom_factor
         } else {
             0.0
         };
